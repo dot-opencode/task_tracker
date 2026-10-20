@@ -19,7 +19,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "cargo test && bash tests/run.sh && bash tests/launcher.sh && TZ=UTC node --test tests/",
+    "test": "cargo test && bash tests/run.sh && bash tests/launcher.sh && TZ=UTC node --test tests/*.test.js",
     "test:cli": "bash tests/run.sh",
     "test:launcher": "bash tests/launcher.sh",
     "test:rust": "cargo test",

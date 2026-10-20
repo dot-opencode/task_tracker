@@ -46,4 +46,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: TZ=UTC node --test tests/
+      - run: TZ=UTC node --test tests/*.test.js

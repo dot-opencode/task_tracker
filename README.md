@@ -144,6 +144,6 @@ Task sessions use the OpenCode default model unless `config.toml` sets `preset` 
 cargo test                    # Rust unit tests
 cargo build --release && bash tests/run.sh   # CLI via the launcher + AGENT_TASKS_BIN (SKIP_CARGO_BUILD=1 skips the build)
 bash tests/launcher.sh        # launcher download/verify/cache, offline
-TZ=UTC node --test tests/     # plugin, RPC and TUI
+TZ=UTC node --test tests/*.test.js     # plugin, RPC and TUI
 ```
 
