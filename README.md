@@ -89,7 +89,7 @@ task doctor                   # check the store
 
 For OpenCode session signals, install the plugin (see Install). Automation is off until you explicitly run `task auto on 3h`; turn it off with `task auto off`. Open a waiting session with `task open T-0001` or `task next`. The plugin handles task status changes from session signals.
 
-To browse tasks inside the OpenCode TUI, enable the CLI plugin by adding its directory to `~/.config/opencode/cli.json`: `"plugins": ["/path/to/agent-tasks/skills/agent-tasks/opencode/tui"]`. Then `/tasks` (or the command palette, or `<leader>k`) opens a searchable task list grouped by "Waiting for you", "Agent working", "Queued", "Backlog", "Done"; Enter opens the task's session. In the dialog `alt+w` toggles waiting-only and `alt+p` includes postponed tasks. It runs `task ls --json` (`task` from PATH, else the bundled `bin/task`).
+The package exposes both `./server` and `./tui` entries, so `opencode plugin add` also enables the TUI plugin; from a checkout, point `plugins` at the repository root (`<dir>/index.js` is the server, `<dir>/tui.js` the CLI plugin). In the TUI, `/tasks` (or the command palette, or `<leader>k`) opens a searchable task list grouped by "Waiting for you", "Agent working", "Queued", "Backlog", "Done"; Enter opens the task's session. In the dialog `alt+w` toggles waiting-only and `alt+p` includes postponed tasks. It runs `task ls --json` (`task` from PATH, else the bundled `bin/task`).
 
 `task --help` lists every command. Hand edits and moves are fine; the next command commits them.
 

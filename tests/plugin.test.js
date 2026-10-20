@@ -696,3 +696,16 @@ test("entrypoint is a dependency-free native V2 plugin object", async () => {
   assert.equal(plugin.id, "agent-tasks")
   assert.equal(typeof plugin.setup, "function")
 })
+
+test("package exposes server and tui entries, also for local-path loading", async () => {
+  const { readFile } = await import("node:fs/promises")
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"))
+  const server = await import("../skills/agent-tasks/opencode/agent-tasks.js")
+  const tui = await import("../skills/agent-tasks/opencode/tui/tui.js")
+  for (const [key, mod] of [[".", server], ["./server", server], ["./tui", tui]]) {
+    const { default: entry } = await import(new URL(`../${pkg.exports[key]}`, import.meta.url))
+    assert.equal(entry, mod.default, key)
+  }
+  assert.equal((await import("../index.js")).default, server.default)
+  assert.equal((await import("../tui.js")).default, tui.default)
+})

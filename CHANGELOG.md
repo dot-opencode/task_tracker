@@ -4,7 +4,7 @@
 
 - CLI rewritten in Rust (`cli/`, binary `task`).
 - `bin/task` is now a launcher that downloads the prebuilt binary pinned in `bin/release.txt` from GitHub Releases (sha256-verified, cached under `~/.cache/agent-tasks/`). `AGENT_TASKS_BIN` runs a local build instead.
-- Install as an OpenCode package plugin: `opencode plugin add github:dot-opencode/task_tracker#release`. The plugin registers the bundled `agent-tasks` skill and tells the agent the absolute path of the `task` CLI.
+- Install as an OpenCode package plugin: `opencode plugin add github:dot-opencode/task_tracker#release`. The plugin registers the bundled `agent-tasks` skill and tells the agent the absolute path of the `task` CLI. The package also ships the `/tasks` TUI plugin (`./tui` export), so no `cli.json` entry is needed; root `index.js`/`tui.js` serve local-path loading.
 - `task install-opencode` is deprecated in favour of the package plugin.
 - CI (fmt, clippy, tests on Linux and macOS, launcher, plugin) and a tag-driven release workflow with prebuilt macOS and Linux (musl) binaries. MIT license.
 - Release build is size-optimised (`opt-level = "z"`, LTO, stripped, `panic = "abort"`).

@@ -4,9 +4,13 @@
   "version": "0.3.0",
   "type": "module",
   "exports": {
-    ".": "./skills/agent-tasks/opencode/agent-tasks.js"
+    ".": "./skills/agent-tasks/opencode/agent-tasks.js",
+    "./server": "./skills/agent-tasks/opencode/agent-tasks.js",
+    "./tui": "./skills/agent-tasks/opencode/tui/tui.js"
   },
   "files": [
+    "index.js",
+    "tui.js",
     "skills/",
     "README.md",
     "LICENSE"
