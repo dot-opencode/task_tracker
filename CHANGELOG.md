@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 — 2026-10-21
+
+- Plugin RPC event `changed` now also fires (`action: "store"`) for changes made by other CLI runs (worker, `check-mrs`, terminal), by polling the store's git log.
+
+## 0.3.0 — 2026-10-20
 
 - CLI rewritten in Rust (`cli/`, binary `task`).
 - `bin/task` is now a launcher that downloads the prebuilt binary pinned in `bin/release.txt` from GitHub Releases (sha256-verified, cached under `~/.cache/agent-tasks/`). `AGENT_TASKS_BIN` runs a local build instead.

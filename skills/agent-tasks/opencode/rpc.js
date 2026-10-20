@@ -110,8 +110,9 @@ export const AgentTasksRpc = {
     setAuto: method(object({ enabled: { type: "boolean" }, duration: { type: "string", minLength: 1 } }, ["enabled"])),
   },
   events: {
-    // A task changed through this plugin (an RPC call or a session signal). Hand edits and other
-    // CLI runs do not emit it; refetch with `list`/`show`.
+    // A task changed through this plugin (an RPC call or a session signal). Other CLI runs (worker,
+    // check-mrs, terminal) emit it with action "store" and no id, detected by polling the store's
+    // git log, so it arrives after a delay (~2s poll + debounce); refetch with `list`/`show`.
     changed: { schema: object({ id: { type: "string" }, action: { type: "string" } }, ["action"]) },
   },
 }

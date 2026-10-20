@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
-pub const VERSION: &str = "0.3.0";
+pub const VERSION: &str = "0.3.1";
 
 pub const FOLDERS: [&str; 15] = [
     "00_backlog",

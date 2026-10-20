@@ -458,6 +458,64 @@ test("rpc: registered with the plugin; signals that move a task and recorded fie
   assert.deepEqual(emitted.map(([name, data]) => `${name}:${data.action}:${data.id}`).sort(), ["changed:set:T-0083", "changed:signal:T-0083"])
 })
 
+function storeWatchEnv() {
+  const emitted = []
+  const watchers = []
+  const unwatched = []
+  const env = contextFor({ sessions: BOUND, events: deferredEvents() })
+  const ctx = { ...env.ctx, rpc: { register: async () => ({ events: { emit: async (...a) => emitted.push(a) } }) } }
+  env.deps.storeDir = "/nonexistent/store"
+  env.deps.storePollMs = 1
+  env.deps.storeDebounceMs = 10
+  env.deps.watchStore = (file, ms, onChange) => {
+    watchers.push({ file, ms, onChange })
+    return () => unwatched.push(file)
+  }
+  return { env, ctx, emitted, watchers, unwatched }
+}
+const storeEvents = (emitted) => emitted.filter(([name, data]) => name === "changed" && data.action === "store")
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
+test("store watcher: a burst of store changes emits one changed event", async (t) => {
+  const { env, ctx, emitted, watchers } = storeWatchEnv()
+  const stop = await reg(ctx, env.deps)
+  t.after(stop)
+  assert.equal(watchers.length, 1)
+  assert.equal(watchers[0].file, "/nonexistent/store/.git/logs/HEAD")
+  for (let i = 0; i < 5; i++) watchers[0].onChange()
+  await wait(40)
+  assert.equal(storeEvents(emitted).length, 1)
+  watchers[0].onChange()
+  await wait(40)
+  assert.equal(storeEvents(emitted).length, 2)
+})
+
+test("store watcher: no event after stop and the file is unwatched", async () => {
+  const { env, ctx, emitted, watchers, unwatched } = storeWatchEnv()
+  const stop = await reg(ctx, env.deps)
+  watchers[0].onChange()
+  stop()
+  watchers[0].onChange()
+  await wait(40)
+  assert.equal(storeEvents(emitted).length, 0)
+  assert.deepEqual(unwatched, ["/nonexistent/store/.git/logs/HEAD"])
+})
+
+test("store watcher: default watcher tolerates a missing store file and is not started without rpc", async (t) => {
+  const { env, ctx, emitted } = storeWatchEnv()
+  delete env.deps.watchStore
+  const stop = await reg(ctx, env.deps)
+  await wait(10)
+  stop()
+  assert.equal(storeEvents(emitted).length, 0)
+  const plain = storeWatchEnv()
+  let started = 0
+  plain.env.deps.watchStore = () => { started += 1 }
+  const stopPlain = await reg(plain.env.ctx, plain.env.deps)
+  t.after(stopPlain)
+  assert.equal(started, 0)
+})
+
 test("runTask failures and session lookup errors are logged, never thrown", async (t) => {
   const events = deferredEvents()
   const env = contextFor({ sessions: BOUND, events, runTask: async () => { throw new Error("spawn ENOENT") } })

@@ -106,8 +106,9 @@ Methods: `list` (`folder` | `waiting` | `all`, `workspace`), `show`, `logs`, `cr
 `{"_tag": "RpcError", "type": "task_failed" | "invalid_input", "message": ...}`.
 
 The event `rpc.agent-tasks.changed` (`{id, action}`, on `GET /api/event`) fires after every change made through the
-plugin: RPC calls, session signals that move a task, recorded spec/plan/pr. Hand edits and CLI runs outside the plugin
-do not fire it, so refetch on focus as well.
+plugin: RPC calls, session signals that move a task, recorded spec/plan/pr. CLI runs outside the plugin (worker,
+`check-mrs`, terminal `task mv`) fire it with `action: "store"` and no `id`, detected by polling the store's git log
+(a couple of seconds' delay, bursts coalesced). Uncommitted hand edits are not detected, so refetch on focus as well.
 
 ```js
 // In the OpenCode web UI (same origin, signed in via `opencode pair`):

@@ -1,7 +1,8 @@
 // agent-tasks OpenCode plugin logic. Pure helpers plus registerAgentTasks(ctx, deps).
 // All CLI calls go through deps.runTask(args) so tests never spawn bin/task.
-import { readFileSync } from "node:fs"
-import { basename, dirname, isAbsolute, relative, resolve } from "node:path"
+import { readFileSync, unwatchFile, watchFile } from "node:fs"
+import { homedir } from "node:os"
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import { normalizeId, registerRpc } from "./agent-tasks-rpc.js"
 
@@ -16,6 +17,64 @@ const MAX_HOPS = 5
 const WINDOW_MS = 2000
 const RESUBSCRIBE_MS = 1000
 const MAX_EMPTY_ENDS = 20
+const STORE_POLL_MS = 2000
+const STORE_DEBOUNCE_MS = 300
+
+// Mirrors cli/src/core.rs store(): $AGENT_TASKS_HOME (non-empty) else $HOME/.agent-tasks.
+function defaultStoreDir() {
+  const env = process.env.AGENT_TASKS_HOME
+  if (env) return resolve(env)
+  return join(process.env.HOME || homedir(), ".agent-tasks")
+}
+
+// Default watcher: stat-polls `file` (works when it appears later); returns an unwatch function.
+function watchStatFile(file, intervalMs, onChange) {
+  const listener = (cur, prev) => {
+    if (cur.mtimeMs !== prev.mtimeMs || cur.size !== prev.size) onChange()
+  }
+  watchFile(file, { interval: intervalMs, persistent: false }, listener)
+  return () => unwatchFile(file, listener)
+}
+
+// Watches the store git log and emits changed({action:"store"}) debounced. Returns stop().
+function startStoreWatcher({ deps, changed, log }) {
+  const dir = deps.storeDir ?? defaultStoreDir()
+  const pollMs = deps.storePollMs ?? STORE_POLL_MS
+  const debounceMs = deps.storeDebounceMs ?? STORE_DEBOUNCE_MS
+  const watch = deps.watchStore ?? watchStatFile
+  let timer
+  let stopped = false
+  const fire = () => {
+    timer = undefined
+    if (stopped) return
+    Promise.resolve(changed({ action: "store" })).catch((error) => log("store change emit failed", { error: String(error) }))
+  }
+  const onChange = () => {
+    if (stopped) return
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(fire, debounceMs)
+  }
+  const unwatchers = []
+  for (const file of [join(dir, ".git", "logs", "HEAD")]) {
+    try {
+      unwatchers.push(watch(file, pollMs, onChange))
+    } catch (error) {
+      Promise.resolve(log("could not watch store file", { file, error: String(error) })).catch(() => {})
+    }
+  }
+  return () => {
+    stopped = true
+    if (timer) clearTimeout(timer)
+    timer = undefined
+    for (const unwatch of unwatchers) {
+      try {
+        unwatch?.()
+      } catch {
+        // Cleanup must not throw.
+      }
+    }
+  }
+}
 
 export const GATED_SKILLS = new Set(["writing-plans", "executing-plans", "subagent-driven-development"])
 // Where each gated skill may run: planning needs the spec approved, implementation the plan approved.
@@ -357,6 +416,7 @@ export async function registerAgentTasks(ctx, deps) {
 
   // Set once the RPC is registered; announces task changes to RPC subscribers.
   let changed = async () => {}
+  let rpcRegistered = false
 
   async function signal(sessionID, name, text) {
     const binding = await sessionFor(sessionID)
@@ -572,8 +632,18 @@ export async function registerAgentTasks(ctx, deps) {
     // RPC callers get CLI errors back as task_failed, so nonzero exits are not logged here.
     const runQuiet = (args) => deps.runTask(args).catch((error) => ({ code: -1, stdout: "", stderr: String(error) }))
     changed = await registerRpc(ctx, { runTask: runQuiet, readFile: deps.readFile, log })
+    rpcRegistered = typeof ctx.rpc?.register === "function"
   } catch (error) {
     await log("could not register rpc", { error: String(error) })
+  }
+  // Other CLI runs (worker, check-mrs, terminal) commit to the store repo; announce those too.
+  let stopStoreWatch = () => {}
+  if (rpcRegistered) {
+    try {
+      stopStoreWatch = startStoreWatcher({ deps, changed, log })
+    } catch (error) {
+      await log("could not watch store", { error: String(error) })
+    }
   }
   const resubscribeMs = deps.resubscribeMs ?? RESUBSCRIBE_MS
   const sleep = (ms) => new Promise((resolveSleep) => {
@@ -618,6 +688,11 @@ export async function registerAgentTasks(ctx, deps) {
   return {
     stop: () => {
       controller.abort()
+      try {
+        stopStoreWatch()
+      } catch {
+        // Cleanup must not throw.
+      }
       try {
         skillRegistration?.dispose?.()
       } catch {
