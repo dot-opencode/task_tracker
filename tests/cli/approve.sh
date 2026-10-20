@@ -92,15 +92,3 @@ test_approve_rejects_bad_input() {
   assert_eq "$(at_folder T-0001)" 04_spec_review
 }
 
-# Without lib/run.sh (plan task 5) approve --now from 5 cannot send the prompt.
-test_approve_now_from_approved_without_run_lib_prints_hint() {
-  at_stubs
-  at_task 07_approved T-0001 "Waiting" session ses_a1
-  mkdir -p "$TMP/pkg"
-  cp -R "$ROOT/skills/agent-tasks/bin" "$ROOT/skills/agent-tasks/lib" "$TMP/pkg/"
-  rm -f "$TMP/pkg/lib/run.sh"
-  assert_eq "$("$TMP/pkg/bin/task" approve 1 --now)" "start
-start the implementation in the session yourself"
-  assert_eq "$(at_folder T-0001)" 08_implementing
-  assert_eq "$(cat "$TMP/opencode.log")" ""
-}

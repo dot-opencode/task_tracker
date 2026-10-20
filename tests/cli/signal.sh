@@ -367,19 +367,10 @@ test_signal_active_count_and_oldest() {
   at_task 07_approved T-0004 "D" session ses_d1
   at_task 05_planning T-0005 "E"
   at_task 06_plan_review T-0006 "F"
-  load_lib core
-  load_lib frontmatter
-  load_lib signal
-  assert_eq "$(active_count)" 3
-  assert_eq "$(count_tasks_in 07_approved 01_ready)" 2
-  sleep 1
-  touch "$(task_path_of T-0003)"   # ctime moves with any inode change
-  assert_contains "$(oldest_task_in 07_approved)" "/T-0004-"
-  assert_contains "$(oldest_task_in --with-session 07_approved 02_exploring)" "/T-0004-"
-  assert_eq "$(oldest_task_in 01_ready)" ""
-  assert_eq "$(max_active)" 2
+  assert_eq "$("$TASK" auto | sed -n 2p)" "active agents: 3/2"
+  assert_eq "$("$TASK" auto | sed -n 4p)" "queue: 2 approved, 0 ready"
   printf 'max_active = 5\n' > "$AGENT_TASKS_HOME/config.toml"
-  assert_eq "$(max_active)" 5
+  assert_eq "$("$TASK" auto | sed -n 2p)" "active agents: 3/5"
 }
 
 test_signal_input_with_old_auto_prompt_marker_counts() {

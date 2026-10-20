@@ -8,6 +8,7 @@ mod commit;
 mod core;
 mod frontmatter;
 mod lock;
+mod preset;
 mod projects;
 mod subtasks;
 

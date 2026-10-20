@@ -126,21 +126,21 @@ queue: 1 approved, 2 ready"
 }
 
 test_auto_helpers() {
-  load_lib core
-  load_lib auto
-  mkdir -p "$STORE"
-  if auto_enabled; then fail "enabled without .auto"; fi
-  printf 'until=0\nsince=1\n' > "$STORE/.auto"
-  auto_enabled || fail "until=0 must be enabled"
-  assert_eq "$(auto_remaining)" "∞"
-  printf 'until=%s\nsince=1\n' "$(($(date +%s) + 100))" > "$STORE/.auto"
-  auto_enabled || fail "future until must be enabled"
-  [ "$(auto_remaining)" -le 100 ] && [ "$(auto_remaining)" -ge 98 ] || fail "remaining $(auto_remaining)"
-  printf 'until=%s\nsince=1\n' "$(($(date +%s) - 1))" > "$STORE/.auto"
-  if auto_enabled; then fail "past until must be disabled"; fi
-  auto_expired || fail "past until must be expired"
-  assert_eq "$(parse_duration 1h30m)" 5400
-  assert_eq "$(fmt_duration 6120)" "1h42m"
+  "$TASK" ls >/dev/null
+  assert_eq "$("$TASK" auto | head -n 1)" "automation: off"
+  printf 'until=0\nsince=1\n' > "$AGENT_TASKS_HOME/.auto"
+  assert_eq "$("$TASK" auto | head -n 1)" "automation: on (until 'task auto off')"
+  printf 'until=%s\nsince=1\n' "$(($(date +%s) + 100))" > "$AGENT_TASKS_HOME/.auto"
+  assert_eq "$("$TASK" auto | head -n 1)" "automation: on, 2m left"
+  printf 'until=%s\nsince=1\n' "$(($(date +%s) - 1))" > "$AGENT_TASKS_HOME/.auto"
+  assert_eq "$("$TASK" auto | head -n 1)" "automation: off (expired)"
+  # parse_duration / fmt_duration: 1h30m is 5400 s, shown back as 1h30m
+  at_stubs
+  "$TASK" auto on 1h30m >/dev/null
+  local until
+  until="$(sed -n 's/^until=//p' "$AGENT_TASKS_HOME/.auto")"
+  [ "$((until - $(date +%s)))" -le 5400 ] && [ "$((until - $(date +%s)))" -ge 5398 ] || fail "until $until"
+  assert_eq "$("$TASK" auto | head -n 1)" "automation: on, 1h30m left"
 }
 
 # task approve while automation is on (lib/approve.sh asks lib/auto.sh).

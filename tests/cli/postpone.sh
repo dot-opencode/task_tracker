@@ -135,11 +135,10 @@ test_postpone_not_waiting_not_active_not_next() {
   "$TASK" postpone 1 >/dev/null
   assert_not_contains "$("$TASK" ls --waiting)" "T-0001"
   assert_eq "$("$TASK" next)" "nothing is waiting for you"
-  load_lib core; load_lib signal
-  assert_eq "$(active_count)" 0
+  assert_contains "$("$TASK" auto)" "active agents: 0/2"
   at_task 08_implementing T-0002 "Busy" session ses_b1
   "$TASK" postpone 2 >/dev/null 2>&1
-  assert_eq "$(active_count)" 0
+  assert_contains "$("$TASK" auto)" "active agents: 0/2"
 }
 
 test_postpone_not_archived_automatically() {

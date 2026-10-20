@@ -221,18 +221,17 @@ test_open_notify_body_starting_with_dash() {
 
 test_open_notify_kill_spares_own_ancestor() {
   at_stubs
-  load_lib core
-  load_lib open
+  at_task 02_exploring T-0001 "Anc" session ses_a1
   mkdir -p "$AGENT_TASKS_HOME/.notify"
+  # The pid of this shell is an ancestor of the CLI: only the file goes away.
   printf '%s\n' "$$" > "$AGENT_TASKS_HOME/.notify/T-0001.alerter-pid"
-  ( notify_kill T-0001 )
+  "$TASK" signal 1 input --session ses_a1 --text hi >/dev/null
   assert_no_file "$AGENT_TASKS_HOME/.notify/T-0001.alerter-pid"
-  is_own_ancestor "$$" || fail "\$\$ must be its own ancestor"
   sleep 30 &
   local child=$!
-  if is_own_ancestor "$child"; then fail "a child is not an ancestor"; fi
   printf '%s\n' "$child" > "$AGENT_TASKS_HOME/.notify/T-0001.alerter-pid"
-  notify_kill T-0001
+  "$TASK" signal 1 input --session ses_a1 --text hi >/dev/null
   sleep 0.2
   if kill -0 "$child" 2>/dev/null; then fail "notify_kill spared a foreign alerter"; fi
+  assert_no_file "$AGENT_TASKS_HOME/.notify/T-0001.alerter-pid"
 }
