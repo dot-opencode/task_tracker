@@ -119,12 +119,14 @@ fn closed_frontmatter(text: &str) -> bool {
 /// Dies unless line 1 is `---` and a closing `---` follows. Every mutating
 /// command calls this first.
 pub fn fm_require(file: &str) {
-    let ok = read_file(file).map(|t| closed_frontmatter(&t)).unwrap_or(false);
+    let ok = read_file(file)
+        .map(|t| closed_frontmatter(&t))
+        .unwrap_or(false);
     if !ok {
-        let rel = file
-            .strip_prefix(&format!("{}/", store()))
-            .unwrap_or(file);
-        die(format!("malformed frontmatter in {rel} (run 'task doctor')"));
+        let rel = file.strip_prefix(&format!("{}/", store())).unwrap_or(file);
+        die(format!(
+            "malformed frontmatter in {rel} (run 'task doctor')"
+        ));
     }
 }
 
@@ -423,7 +425,10 @@ mod tests {
     #[test]
     fn quote_rules() {
         assert_eq!(fm_quote("plain-value"), "plain-value");
-        assert_eq!(fm_quote("https://a.example/x?y=1"), "https://a.example/x?y=1");
+        assert_eq!(
+            fm_quote("https://a.example/x?y=1"),
+            "https://a.example/x?y=1"
+        );
         assert_eq!(fm_quote("a: b"), "\"a: b\"");
         assert_eq!(fm_quote("a #b"), "\"a #b\"");
         assert_eq!(fm_quote("ends:"), "\"ends:\"");
@@ -434,14 +439,29 @@ mod tests {
     #[test]
     fn typed_scalars_round_trip() {
         let f = tmpfile("typed", "---\nid: T-0001\n---\n");
-        for v in ["123", "2026-10-01", "true", "null", "~", "No", "OFF", "1.5", "-7", "12:30"] {
+        for v in [
+            "123",
+            "2026-10-01",
+            "true",
+            "null",
+            "~",
+            "No",
+            "OFF",
+            "1.5",
+            "-7",
+            "12:30",
+        ] {
             fm_set(&f, "source", &fm_quote(v)).unwrap();
-            assert!(fs::read_to_string(&f).unwrap().contains(&format!("source: \"{v}\"\n")));
+            assert!(fs::read_to_string(&f)
+                .unwrap()
+                .contains(&format!("source: \"{v}\"\n")));
             assert_eq!(fm_get(&f, "source"), v);
         }
         for v in ["https://x.example/a", "dev_env", "nullable", "2026-10-01-x"] {
             fm_set(&f, "source", &fm_quote(v)).unwrap();
-            assert!(fs::read_to_string(&f).unwrap().contains(&format!("source: {v}\n")));
+            assert!(fs::read_to_string(&f)
+                .unwrap()
+                .contains(&format!("source: {v}\n")));
             assert_eq!(fm_get(&f, "source"), v);
         }
     }

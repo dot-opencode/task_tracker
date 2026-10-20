@@ -247,7 +247,12 @@ pub fn cmd_show(args: &[String]) -> i32 {
         println!("## Subtasks");
         for k in kids {
             let kf = task_file(&k);
-            println!("subtasks: {} {} {}", k, folder_of_file(&kf), fm_get(&kf, "title"));
+            println!(
+                "subtasks: {} {} {}",
+                k,
+                folder_of_file(&kf),
+                fm_get(&kf, "title")
+            );
         }
     }
     0
@@ -283,7 +288,13 @@ fn pad(s: &str, w: usize) -> String {
     format!("{}{}  ", s, " ".repeat(w.saturating_sub(n)))
 }
 
-fn emit(i: usize, depth: usize, kids: &HashMap<usize, Vec<usize>>, seen: &mut [bool], ord: &mut Vec<(usize, usize)>) {
+fn emit(
+    i: usize,
+    depth: usize,
+    kids: &HashMap<usize, Vec<usize>>,
+    seen: &mut [bool],
+    ord: &mut Vec<(usize, usize)>,
+) {
     if seen[i] {
         return;
     }
@@ -351,7 +362,11 @@ fn print_table(recs: &[Rec]) {
         ww = ww.max(r.ws.chars().count());
         wi = wi.max(r.id.chars().count());
         ws_w = ws_w.max(r.status.chars().count());
-        let pr = if r.project.is_empty() { "-" } else { &r.project };
+        let pr = if r.project.is_empty() {
+            "-"
+        } else {
+            &r.project
+        };
         wp = wp.max(pr.chars().count());
     }
     let mut head = String::new();
@@ -371,7 +386,14 @@ fn print_table(recs: &[Rec]) {
         }
         line.push_str(&pad(&r.id, wi));
         line.push_str(&pad(&r.status, ws_w));
-        line.push_str(&pad(if r.project.is_empty() { "-" } else { &r.project }, wp));
+        line.push_str(&pad(
+            if r.project.is_empty() {
+                "-"
+            } else {
+                &r.project
+            },
+            wp,
+        ));
         line.push_str(&titles[&i]);
         println!("{line}");
     }
@@ -529,7 +551,10 @@ mod tests {
             slugify("Fix internal service URL: port drift (ABC-6719)"),
             "fix-internal-service-url-port-drift-abc-6719"
         );
-        assert_eq!(slugify("Добавить SAN для ianus.localhost"), "san-ianus-localhost");
+        assert_eq!(
+            slugify("Добавить SAN для ianus.localhost"),
+            "san-ianus-localhost"
+        );
         assert_eq!(slugify("Исправить дрейф"), "");
         assert_eq!(
             slugify("aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff"),

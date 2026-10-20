@@ -67,7 +67,7 @@ test_subtasks_ls_json_fields() {
   assert_eq "$("$TASK" ls --json | jq -c '.[] | select(.id == "T-0002") | .blocked_by')" '[]'
   "$TASK" set 2 depends_on 42 2>/dev/null && fail "missing accepted"
   # a missing dependency counts as blocking
-  sed -i '' 's/^depends_on: .*/depends_on: T-0042/' "$(task_path_of T-0002)"
+  sed_i 's/^depends_on: .*/depends_on: T-0042/' "$(task_path_of T-0002)"
   assert_eq "$("$TASK" ls --json | jq -c '.[] | select(.id == "T-0002") | .blocked_by')" '["T-0042"]'
 }
 
@@ -184,9 +184,9 @@ test_subtasks_doctor_reports_problems() {
   "$TASK" doctor >/dev/null || fail "clean store should pass"
   local f out
   f="$(task_path_of T-0001)"
-  sed -i '' 's/^created:/parent: T-0042\ndepends_on: T-0002 T-0077\ncreated:/' "$f"
+  sed_i 's/^created:/parent: T-0042\ndepends_on: T-0002 T-0077\ncreated:/' "$f"
   f="$(task_path_of T-0002)"
-  sed -i '' 's/^created:/depends_on: T-0001\ncreated:/' "$f"
+  sed_i 's/^created:/depends_on: T-0001\ncreated:/' "$f"
   out="$("$TASK" doctor 2>&1)" && fail "doctor should fail"
   assert_contains "$out" "parent T-0042 does not exist"
   assert_contains "$out" "depends_on T-0077 does not exist"
@@ -195,13 +195,13 @@ test_subtasks_doctor_reports_problems() {
 
 test_subtasks_doctor_parent_cycle_and_workspace() {
   "$TASK" new "A" >/dev/null; "$TASK" new "B" >/dev/null
-  sed -i '' 's/^created:/parent: T-0002\ncreated:/' "$(task_path_of T-0001)"
-  sed -i '' 's/^created:/parent: T-0001\ncreated:/' "$(task_path_of T-0002)"
+  sed_i 's/^created:/parent: T-0002\ncreated:/' "$(task_path_of T-0001)"
+  sed_i 's/^created:/parent: T-0001\ncreated:/' "$(task_path_of T-0002)"
   assert_contains "$("$TASK" doctor 2>&1 || true)" "parent cycle"
-  sed -i '' '/^parent:/d' "$(task_path_of T-0001)" "$(task_path_of T-0002)"
+  sed_i '/^parent:/d' "$(task_path_of T-0001)" "$(task_path_of T-0002)"
   mkdir -p "$TMP/p2"
   "$TASK" project add p2 "$TMP/p2" --ws other >/dev/null
   "$TASK" new "C" --project p2 --ws other >/dev/null
-  sed -i '' 's/^created:/parent: T-0001\ncreated:/' "$(task_path_of T-0003)"
+  sed_i 's/^created:/parent: T-0001\ncreated:/' "$(task_path_of T-0003)"
   assert_contains "$("$TASK" doctor 2>&1 || true)" "in another workspace"
 }

@@ -1,8 +1,9 @@
 [package]
 name = "agent-tasks"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "File-based task tracker CLI for agents (port of the Bash `task`)"
+license = "MIT"
 publish = false
 
 [[bin]]

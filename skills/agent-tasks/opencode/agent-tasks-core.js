@@ -1,5 +1,6 @@
 // agent-tasks OpenCode plugin logic. Pure helpers plus registerAgentTasks(ctx, deps).
 // All CLI calls go through deps.runTask(args) so tests never spawn bin/task.
+import { readFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path"
 
 import { normalizeId, registerRpc } from "./agent-tasks-rpc.js"
@@ -7,6 +8,8 @@ import { normalizeId, registerRpc } from "./agent-tasks-rpc.js"
 export const LIMIT = 4000
 const OPEN = "<agent-tasks>"
 const CLOSE = "</agent-tasks>"
+const CLI_OPEN = "<agent-tasks-cli>"
+const CLI_CLOSE = "</agent-tasks-cli>"
 const HANDLED_MAX = 2000
 const BINDING_TTL_MS = 30_000
 const MAX_HOPS = 5
@@ -232,6 +235,54 @@ export function gateMessage(skill, id, folder) {
 
 // ---------------------------------------------------------------- runtime
 
+function parseSkill(raw) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(raw)
+  let description = ""
+  if (match) {
+    for (const line of match[1].split(/\r?\n/)) {
+      const kv = /^description:\s*(.+)$/.exec(line)
+      if (kv) description = kv[1].trim().replace(/^['"]|['"]$/g, "")
+    }
+  }
+  return { description, body: (match ? raw.slice(match[0].length) : raw).trim() }
+}
+
+// Register bundled skills in-process. A skill with the same id provided elsewhere
+// (npx skills, user copy) wins. Never throws.
+async function registerSkills(ctx, skills, logger) {
+  try {
+    if (!Array.isArray(skills) || skills.length === 0 || typeof ctx.skill?.transform !== "function") return undefined
+    const loaded = []
+    for (const { id, path } of skills) {
+      try {
+        const parsed = parseSkill(readFileSync(path, "utf8").replace(/^\uFEFF/, ""))
+        loaded.push({ id, name: id, description: parsed.description, path, content: parsed.body })
+      } catch (error) {
+        await logger("could not read bundled skill", { error: String(error), skill: id })
+      }
+    }
+    if (loaded.length === 0) return undefined
+    return await ctx.skill.transform((editor) => {
+      try {
+        if (typeof editor?.add !== "function") return
+        for (const info of loaded) {
+          if (typeof editor.get === "function" && editor.get(info.id)) continue
+          try {
+            editor.add(info)
+          } catch (error) {
+            void logger("bundled skill registration failed", { error: String(error), skill: info.id })
+          }
+        }
+      } catch (error) {
+        void logger("bundled skill registration failed", { error: String(error) })
+      }
+    })
+  } catch (error) {
+    await logger("bundled skill registration failed", { error: String(error) })
+    return undefined
+  }
+}
+
 const sharedState = createState()
 
 export async function registerAgentTasks(ctx, deps) {
@@ -369,8 +420,16 @@ export async function registerAgentTasks(ctx, deps) {
 
   const hasBlock = (parts) => parts.some((p) => p?.type === "text" && typeof p.text === "string" && p.text.includes(OPEN))
 
+  // Tells the agent where the CLI is when it is not on PATH (package install).
+  const hasCliBlock = (parts) => parts.some((p) => p?.type === "text" && typeof p.text === "string" && p.text.includes(CLI_OPEN))
+  function injectCliPath(ev) {
+    if (!deps.taskCli || !Array.isArray(ev?.system) || hasCliBlock(ev.system)) return
+    ev.system.push({ type: "text", text: `${CLI_OPEN}\nThe \`task\` CLI may not be on PATH; run it as \`${deps.taskCli}\` wherever the agent-tasks skill says \`task\`.\n${CLI_CLOSE}` })
+  }
+
   async function inject(ev) {
     try {
+      injectCliPath(ev)
       if (!Array.isArray(ev?.system) || hasBlock(ev.system)) return
       const key = `context:${ev.sessionID}`
       let promise = state.inflight.get(key)
@@ -502,6 +561,7 @@ export async function registerAgentTasks(ctx, deps) {
     }
   }
 
+  const skillRegistration = await registerSkills(ctx, deps.skills, log)
   await ctx.session.hook("prompt", onPrompt)
   await ctx.session.hook("context", inject)
   await ctx.session.hook("compaction", inject)
@@ -556,7 +616,14 @@ export async function registerAgentTasks(ctx, deps) {
 
   // `stop` is the plugin cleanup; `idle` waits for queued CLI calls (tests only).
   return {
-    stop: () => controller.abort(),
+    stop: () => {
+      controller.abort()
+      try {
+        skillRegistration?.dispose?.()
+      } catch {
+        // Cleanup must not throw.
+      }
+    },
     idle: async () => {
       while (pending.size) await Promise.allSettled([...pending])
     },

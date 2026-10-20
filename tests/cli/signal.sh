@@ -377,7 +377,7 @@ test_signal_input_with_old_auto_prompt_marker_counts() {
   at_stubs
   at_task 03_brainstorming T-0001 "Old marker" session ses_a1
   mkdir -p "$AGENT_TASKS_HOME/.notify"
-  touch -t "$(date -v-2M +%Y%m%d%H%M.%S)" "$AGENT_TASKS_HOME/.notify/T-0001.auto-prompt"
+  touch -t "$(minutes_ago 2)" "$AGENT_TASKS_HOME/.notify/T-0001.auto-prompt"
   "$TASK" signal 1 input --session ses_a1 --text hi >/dev/null
   assert_file "$AGENT_TASKS_HOME/.notify/T-0001.last-user"
   assert_no_file "$AGENT_TASKS_HOME/.notify/T-0001.auto-prompt"

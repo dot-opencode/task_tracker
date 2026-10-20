@@ -13,7 +13,7 @@ at_project() {
 }
 
 at_age() {   # at_age <id> <minutes> — sets the task file's mtime back
-  touch -t "$(date -v-"$2"M +%Y%m%d%H%M.%S)" "$(task_path_of "$1")"
+  touch -t "$(minutes_ago "$2")" "$(task_path_of "$1")"
 }
 
 test_run_without_auto_does_nothing() {

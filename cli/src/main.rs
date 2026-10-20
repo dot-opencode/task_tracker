@@ -51,7 +51,7 @@ automation:
   task run --once
   task open <id>
   task next
-  task install-opencode
+  task install-opencode   (deprecated: use `opencode plugin add github:dot-opencode/task_tracker#release`)
 
 <id>: T-0083, t-83 or 83
 folders: 00_backlog 01_ready 02_exploring 03_brainstorming 04_spec_review 05_planning
@@ -100,7 +100,8 @@ fn handler(cmd: &str) -> Option<Handler> {
 /// `^[a-z][a-z-]*$`
 fn command_shaped(s: &str) -> bool {
     let mut c = s.chars();
-    matches!(c.next(), Some(f) if f.is_ascii_lowercase()) && c.all(|c| c.is_ascii_lowercase() || c == '-')
+    matches!(c.next(), Some(f) if f.is_ascii_lowercase())
+        && c.all(|c| c.is_ascii_lowercase() || c == '-')
 }
 
 fn real_main() -> i32 {

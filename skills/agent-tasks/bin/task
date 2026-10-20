@@ -1,21 +1,124 @@
 #!/bin/sh
-# Entry point shim: resolves its own symlinks and execs the Rust binary built
-# at <repo>/target/release/task (cargo build --release).
+# task launcher: fetches the prebuilt `task` binary pinned in release.txt
+# from GitHub Releases (dot-opencode/task_tracker), verifies its sha256, caches it
+# and execs it.
+#
+# Environment:
+#   AGENT_TASKS_BIN                   exec this binary instead (skips download)
+#   AGENT_TASKS_RELEASE_BASE_URL      test-only: replaces
+#                                      https://github.com/dot-opencode/task_tracker/releases/download
+#   AGENT_TASKS_SELF                   set for the binary: absolute path of this
+#                                      launcher (what it re-invokes / launchd runs)
+#   AGENT_TASKS_ROOT                   set for the binary: the skill directory
+#   XDG_CACHE_HOME                     cache root (default: $HOME/.cache)
+
 set -eu
 
-self="$0"
-while [ -L "$self" ]; do
-  dir="$(cd -P "$(dirname "$self")" && pwd -P)" || exit 1
-  target="$(readlink "$self")"
-  case "$target" in /*) self="$target" ;; *) self="$dir/$target" ;; esac
-done
-dir="$(cd -P "$(dirname "$self")" && pwd -P)" || { echo "task: cannot resolve CLI path" >&2; exit 1; }
-AGENT_TASKS_ROOT="$(cd -P "$dir/.." && pwd -P)"
-repo="$(cd -P "$AGENT_TASKS_ROOT/../.." && pwd -P)"
-bin="$repo/target/release/task"
-if [ ! -x "$bin" ]; then
-  echo "task: binary not found at $bin; run 'cargo build --release' in $repo" >&2
+die() {
+  printf 'task: %s\n' "$*" >&2
   exit 1
-fi
+}
+
+# --- resolve this script's absolute path, following symlinks ---------------
+resolve_self() {
+  p=$1
+  while [ -h "$p" ]; do
+    dir=$(cd -P "$(dirname "$p")" && pwd)
+    link=$(readlink "$p")
+    case $link in
+      /*) p=$link ;;
+      *) p=$dir/$link ;;
+    esac
+  done
+  dir=$(cd -P "$(dirname "$p")" && pwd)
+  printf '%s/%s\n' "$dir" "$(basename "$p")"
+}
+
+SELF=$(resolve_self "$0")
+SELF_DIR=$(dirname "$SELF")
+# Skill root (holds bin/, opencode/, launchd/); the Rust binary reads it.
+AGENT_TASKS_ROOT=$(cd -P "$SELF_DIR/.." && pwd)
 export AGENT_TASKS_ROOT
-exec "$bin" "$@"
+
+if [ -n "${AGENT_TASKS_BIN:-}" ]; then
+  AGENT_TASKS_SELF=$SELF
+  export AGENT_TASKS_SELF
+  exec "$AGENT_TASKS_BIN" "$@"
+fi
+
+RELEASE_FILE=$SELF_DIR/release.txt
+[ -r "$RELEASE_FILE" ] || die "missing $RELEASE_FILE"
+
+VERSION=$(awk '$1 == "version" { print $2; exit }' "$RELEASE_FILE")
+[ -n "$VERSION" ] || die "no 'version' line in $RELEASE_FILE"
+
+# --- target detection --------------------------------------------------------
+OS=$(uname -s)
+ARCH=$(uname -m)
+TARGET=
+case "$OS/$ARCH" in
+  Darwin/arm64 | Darwin/aarch64) TARGET=aarch64-apple-darwin ;;
+  Darwin/x86_64) TARGET=x86_64-apple-darwin ;;
+  Linux/x86_64 | Linux/amd64) TARGET=x86_64-unknown-linux-musl ;;
+  Linux/aarch64 | Linux/arm64) TARGET=aarch64-unknown-linux-musl ;;
+esac
+[ -n "$TARGET" ] || die "unsupported platform $OS/$ARCH; set AGENT_TASKS_BIN to a task binary or build one with: cargo install --git https://github.com/dot-opencode/task_tracker agent-tasks"
+
+CACHE_ROOT=${XDG_CACHE_HOME:-${HOME:-}/.cache}
+if [ -z "$CACHE_ROOT" ] || [ "$CACHE_ROOT" = "/.cache" ]; then
+  die "cannot determine cache directory (set HOME or XDG_CACHE_HOME)"
+fi
+CACHE_DIR=$CACHE_ROOT/agent-tasks/$VERSION/$TARGET
+BIN=$CACHE_DIR/task
+
+run() {
+  AGENT_TASKS_SELF=$SELF
+  export AGENT_TASKS_SELF
+  exec "$BIN" "$@"
+}
+
+if [ -x "$BIN" ]; then
+  run "$@"
+fi
+
+# --- download + verify -------------------------------------------------------
+EXPECTED=$(awk -v t="$TARGET" '$1 == "sha256" && $2 == t { print $3; exit }' "$RELEASE_FILE")
+[ -n "$EXPECTED" ] || die "no sha256 for $TARGET in $RELEASE_FILE"
+
+BASE_URL=${AGENT_TASKS_RELEASE_BASE_URL:-https://github.com/dot-opencode/task_tracker/releases/download}
+URL=$BASE_URL/v$VERSION/task-$TARGET.tar.gz
+
+mkdir -p "$CACHE_DIR" || die "cannot create $CACHE_DIR"
+WORK=$(mktemp -d "$CACHE_DIR/.tmp.XXXXXX") || die "cannot create temp dir in $CACHE_DIR"
+trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+
+ARCHIVE=$WORK/task.tar.gz
+printf 'task: downloading %s\n' "$URL" >&2
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL --retry 2 -o "$ARCHIVE" "$URL" || die "download failed: $URL"
+elif command -v wget >/dev/null 2>&1; then
+  wget -q -O "$ARCHIVE" "$URL" || die "download failed: $URL"
+else
+  die "need curl or wget to download $URL"
+fi
+
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL=$(sha256sum "$ARCHIVE" | awk '{ print $1 }')
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL=$(shasum -a 256 "$ARCHIVE" | awk '{ print $1 }')
+else
+  die "need sha256sum or shasum to verify the download"
+fi
+[ "$ACTUAL" = "$EXPECTED" ] || die "checksum mismatch for $URL (expected $EXPECTED, got $ACTUAL); refusing to run"
+
+mkdir "$WORK/x"
+tar -xzf "$ARCHIVE" -C "$WORK/x" task || die "cannot extract task from archive"
+[ -f "$WORK/x/task" ] || die "archive does not contain task"
+chmod +x "$WORK/x/task"
+# Atomic publish; concurrent runs each verified the same bytes, last rename wins.
+mv -f "$WORK/x/task" "$BIN" || die "cannot install $BIN"
+# exec skips the EXIT trap, so clean up explicitly.
+rm -rf "$WORK"
+trap - EXIT HUP INT TERM
+
+run "$@"

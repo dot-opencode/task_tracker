@@ -55,7 +55,9 @@ pub fn record_user_activity(id: &str) {
 /// "no running children", with a warning.
 pub fn session_has_running_children(s: &str, active: &str) -> bool {
     if !crate::cmd::session::on_path("opencode") {
-        warn(format!("opencode not found; child sessions of {s} not checked"));
+        warn(format!(
+            "opencode not found; child sessions of {s} not checked"
+        ));
         return false;
     }
     let active = if active.is_empty() {
@@ -91,7 +93,9 @@ pub fn children_running(s: &str, active: &str, kids: &str) -> Option<bool> {
     let a: Value = serde_json::from_str(active).ok()?;
     let a = match &a {
         Value::Object(o) => match o.get("data") {
-            None | Some(Value::Null) | Some(Value::Bool(false)) => Value::Object(Default::default()),
+            None | Some(Value::Null) | Some(Value::Bool(false)) => {
+                Value::Object(Default::default())
+            }
             Some(d) => d.clone(),
         },
         Value::Null => Value::Object(Default::default()),
@@ -105,11 +109,17 @@ pub fn children_running(s: &str, active: &str, kids: &str) -> Option<bool> {
     };
     let items: Vec<Value> = match &data {
         Value::Array(v) => v.clone(),
-        Value::Object(o) => match o.get("items").filter(|v| !v.is_null() && **v != Value::Bool(false)) {
+        Value::Object(o) => match o
+            .get("items")
+            .filter(|v| !v.is_null() && **v != Value::Bool(false))
+        {
             Some(Value::Array(v)) => v.clone(),
             Some(Value::Object(m)) => m.values().cloned().collect(),
             Some(_) => return None,
-            None => match o.get("sessions").filter(|v| !v.is_null() && **v != Value::Bool(false)) {
+            None => match o
+                .get("sessions")
+                .filter(|v| !v.is_null() && **v != Value::Bool(false))
+            {
                 Some(Value::Array(v)) => v.clone(),
                 Some(Value::Object(m)) => m.values().cloned().collect(),
                 Some(_) => return None,
@@ -435,43 +445,116 @@ mod tests {
 
     #[test]
     fn table() {
-        assert_eq!(plan("question", "02_exploring", "", "", ""), ("03_brainstorming".into(), false, true));
-        assert_eq!(plan("question", "05_planning", "", "", "p"), ("06_plan_review".into(), false, true));
-        assert_eq!(plan("question", "05_planning", "", "", ""), ("blocked".into(), false, true));
-        assert_eq!(plan("question", "04_spec_review", "", "", ""), ("".into(), true, true));
-        assert_eq!(plan("question", "10_unmerged", "", "", ""), ("".into(), true, true));
-        assert_eq!(plan("turn-end", "10_unmerged", "", "", ""), ("".into(), true, false));
-        assert_eq!(plan("turn-end", "02_exploring", "s", "", ""), ("04_spec_review".into(), false, true));
-        assert_eq!(plan("turn-end", "03_brainstorming", "", "", ""), ("".into(), true, true));
-        assert_eq!(plan("turn-end", "07_approved", "", "", ""), ("".into(), false, false));
-        assert_eq!(plan("turn-end", "08_implementing", "", "", ""), ("blocked".into(), false, true));
-        assert_eq!(plan("error", "blocked", "", "", ""), ("".into(), false, false));
-        assert_eq!(plan("error", "04_spec_review", "", "", ""), ("blocked".into(), false, true));
-        assert_eq!(plan("input", "blocked", "", "05_planning", ""), ("05_planning".into(), false, false));
-        assert_eq!(plan("answered", "blocked", "", "blocked", ""), ("03_brainstorming".into(), false, false));
-        assert_eq!(plan("answered", "blocked", "", "", ""), ("03_brainstorming".into(), false, false));
-        assert_eq!(plan("finishing", "08_implementing", "", "", ""), ("09_finishing".into(), false, false));
-        assert_eq!(plan("finishing", "09_finishing", "", "", ""), ("".into(), false, false));
-        assert_eq!(plan("question", "postponed", "", "", ""), ("".into(), true, false));
-        assert_eq!(plan("question", "01_ready", "", "", ""), ("".into(), false, false));
-        assert_eq!(plan("input", "02_exploring", "", "", ""), ("".into(), false, false));
+        assert_eq!(
+            plan("question", "02_exploring", "", "", ""),
+            ("03_brainstorming".into(), false, true)
+        );
+        assert_eq!(
+            plan("question", "05_planning", "", "", "p"),
+            ("06_plan_review".into(), false, true)
+        );
+        assert_eq!(
+            plan("question", "05_planning", "", "", ""),
+            ("blocked".into(), false, true)
+        );
+        assert_eq!(
+            plan("question", "04_spec_review", "", "", ""),
+            ("".into(), true, true)
+        );
+        assert_eq!(
+            plan("question", "10_unmerged", "", "", ""),
+            ("".into(), true, true)
+        );
+        assert_eq!(
+            plan("turn-end", "10_unmerged", "", "", ""),
+            ("".into(), true, false)
+        );
+        assert_eq!(
+            plan("turn-end", "02_exploring", "s", "", ""),
+            ("04_spec_review".into(), false, true)
+        );
+        assert_eq!(
+            plan("turn-end", "03_brainstorming", "", "", ""),
+            ("".into(), true, true)
+        );
+        assert_eq!(
+            plan("turn-end", "07_approved", "", "", ""),
+            ("".into(), false, false)
+        );
+        assert_eq!(
+            plan("turn-end", "08_implementing", "", "", ""),
+            ("blocked".into(), false, true)
+        );
+        assert_eq!(
+            plan("error", "blocked", "", "", ""),
+            ("".into(), false, false)
+        );
+        assert_eq!(
+            plan("error", "04_spec_review", "", "", ""),
+            ("blocked".into(), false, true)
+        );
+        assert_eq!(
+            plan("input", "blocked", "", "05_planning", ""),
+            ("05_planning".into(), false, false)
+        );
+        assert_eq!(
+            plan("answered", "blocked", "", "blocked", ""),
+            ("03_brainstorming".into(), false, false)
+        );
+        assert_eq!(
+            plan("answered", "blocked", "", "", ""),
+            ("03_brainstorming".into(), false, false)
+        );
+        assert_eq!(
+            plan("finishing", "08_implementing", "", "", ""),
+            ("09_finishing".into(), false, false)
+        );
+        assert_eq!(
+            plan("finishing", "09_finishing", "", "", ""),
+            ("".into(), false, false)
+        );
+        assert_eq!(
+            plan("question", "postponed", "", "", ""),
+            ("".into(), true, false)
+        );
+        assert_eq!(
+            plan("question", "01_ready", "", "", ""),
+            ("".into(), false, false)
+        );
+        assert_eq!(
+            plan("input", "02_exploring", "", "", ""),
+            ("".into(), false, false)
+        );
     }
 
     #[test]
     fn body() {
-        assert_eq!(signal_body("turn-end", "", "04_spec_review", "x.md", ""), "Spec ready for review: x.md");
-        assert_eq!(signal_body("turn-end", "", "06_plan_review", "", "p.md"), "Plan ready for review: p.md");
+        assert_eq!(
+            signal_body("turn-end", "", "04_spec_review", "x.md", ""),
+            "Spec ready for review: x.md"
+        );
+        assert_eq!(
+            signal_body("turn-end", "", "06_plan_review", "", "p.md"),
+            "Plan ready for review: p.md"
+        );
         assert_eq!(signal_body("error", "boom", "blocked", "", ""), "boom");
-        assert_eq!(signal_body("stalled", "", "blocked", "", ""), "The session stopped.");
+        assert_eq!(
+            signal_body("stalled", "", "blocked", "", ""),
+            "The session stopped."
+        );
         assert_eq!(signal_body("input", "", "blocked", "", ""), "input");
     }
 
     #[test]
     fn children() {
         let active = r#"{"data":{"ses_k":{}}}"#;
-        let kids = r#"{"data":[{"id":"ses_k","parentID":"ses_p"},{"id":"ses_o","parentID":"ses_p"}]}"#;
+        let kids =
+            r#"{"data":[{"id":"ses_k","parentID":"ses_p"},{"id":"ses_o","parentID":"ses_p"}]}"#;
         assert_eq!(children_running("ses_p", active, kids), Some(true));
-        assert_eq!(children_running("ses_p", r#"{"data":{}}"#, kids), Some(false));
+        assert_eq!(
+            children_running("ses_p", r#"{"data":{}}"#, kids),
+            Some(false)
+        );
         // a child of another parent does not count
         let other = r#"{"data":[{"id":"ses_k","parentID":"ses_x"}]}"#;
         assert_eq!(children_running("ses_p", active, other), Some(false));

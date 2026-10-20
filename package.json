@@ -1,14 +1,23 @@
 {
   "name": "agent-tasks",
-  "version": "0.2.0",
   "private": true,
+  "version": "0.3.0",
   "type": "module",
+  "exports": {
+    ".": "./skills/agent-tasks/opencode/agent-tasks.js"
+  },
+  "files": [
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "test": "cargo test && bash tests/run.sh && TZ=UTC node --test tests/",
+    "test": "cargo test && bash tests/run.sh && bash tests/launcher.sh && TZ=UTC node --test tests/",
     "test:cli": "bash tests/run.sh",
+    "test:launcher": "bash tests/launcher.sh",
     "test:rust": "cargo test",
     "test:plugin": "TZ=UTC node --test tests/plugin.test.js"
   }

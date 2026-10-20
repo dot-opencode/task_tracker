@@ -6,10 +6,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TASK="$ROOT/skills/agent-tasks/bin/task"
 PASS=0; FAIL=0
 
-# The skill's bin/task is a shim around target/release/task: build it once.
+# The skill's bin/task is a launcher that downloads a release binary; tests run
+# it offline against the freshly built one via AGENT_TASKS_BIN.
 if [ -z "${SKIP_CARGO_BUILD:-}" ]; then
   (cd "$ROOT" && cargo build --release --quiet) || { echo "cargo build --release failed"; exit 1; }
 fi
+export AGENT_TASKS_BIN="$ROOT/target/release/task"
 FILTER="${1:-}"
 
 setup() {
@@ -18,7 +20,7 @@ setup() {
   TMP="$(cd -P "$TMP" && pwd -P)"
   export AGENT_TASKS_HOME="$TMP/store"
   export HOME="$TMP/home"                 # isolates global git config too
-  unset XDG_CONFIG_HOME AGENT_MEMORY_HOME AGENT_TASKS_LOCK_TIMEOUT
+  unset XDG_CONFIG_HOME AGENT_TASKS_SELF AGENT_MEMORY_HOME AGENT_TASKS_LOCK_TIMEOUT
   export GIT_CONFIG_NOSYSTEM=1
   # Fixed "now" for archiving: fixtures dated 2026-10-01 must not age into archive.
   export AGENT_TASKS_NOW="2026-10-02 00:00"
@@ -41,6 +43,16 @@ assert_contains() { case "$1" in *"$2"*) ;; *) fail "no '$2' in: $1" ;; esac; }
 assert_not_contains() { case "$1" in *"$2"*) fail "unexpected '$2' in: $1" ;; *) ;; esac; }
 assert_file() { [ -f "$1" ] || fail "missing file: $1"; }
 assert_no_file() { [ ! -e "$1" ] || fail "unexpected file: $1"; }
+
+# Portable (BSD/GNU) helpers.
+minutes_ago() {   # minutes_ago <n> — touch -t timestamp n minutes in the past
+  if date -v-1M +%s >/dev/null 2>&1; then date -v-"$1"M +%Y%m%d%H%M.%S
+  else date -d "$1 minutes ago" +%Y%m%d%H%M.%S; fi
+}
+sed_i() {   # sed_i <script> <file>... — in-place sed that works with BSD and GNU sed
+  local script="$1" f; shift
+  for f in "$@"; do sed -i.bak "$script" "$f"; rm -f "$f.bak"; done
+}
 
 last_subject() { git -C "$AGENT_TASKS_HOME" log -1 --format=%s; }
 last_body() { git -C "$AGENT_TASKS_HOME" log -1 --format=%b; }

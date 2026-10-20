@@ -7,6 +7,7 @@ import { registerAgentTasks } from "./agent-tasks-core.js"
 
 const moduleDirectory = await realpath(dirname(fileURLToPath(import.meta.url)))
 const taskCli = resolve(moduleDirectory, "../bin/task")
+const bundledSkills = [{ id: "agent-tasks", path: resolve(moduleDirectory, "../SKILL.md") }]
 const TIMEOUT_MS = 30_000
 
 function runTask(args) {
@@ -32,7 +33,7 @@ async function log(entry) {
 export default {
   id: "agent-tasks",
   async setup(ctx) {
-    const { stop } = await registerAgentTasks(ctx, { runTask, readFile, now: () => Date.now(), log })
+    const { stop } = await registerAgentTasks(ctx, { runTask, readFile, now: () => Date.now(), log, taskCli, skills: bundledSkills })
     return stop
   },
 }

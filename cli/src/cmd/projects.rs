@@ -130,7 +130,11 @@ fn project_ls(args: &[String]) {
     let nw = rows.iter().map(|r| r.1.chars().count()).max().unwrap_or(0);
     for (w, n) in &rows {
         let p = project_path(w, n);
-        let suffix = if Path::new(&p).is_dir() { "" } else { " (missing)" };
+        let suffix = if Path::new(&p).is_dir() {
+            ""
+        } else {
+            " (missing)"
+        };
         println!(
             "{w}{}  {n}{}  {p}{suffix}",
             " ".repeat(wsw - w.chars().count()),
@@ -155,7 +159,10 @@ fn project_import_memory(args: &[String]) {
     }
     let mem = match std::env::var("AGENT_MEMORY_HOME") {
         Ok(v) if !v.is_empty() => v,
-        _ => format!("{}/.agent-memory", std::env::var("HOME").unwrap_or_default()),
+        _ => format!(
+            "{}/.agent-memory",
+            std::env::var("HOME").unwrap_or_default()
+        ),
     };
     if !Path::new(&mem).is_dir() {
         die(format!("no agent-memory store at {mem}"));
@@ -164,13 +171,22 @@ fn project_import_memory(args: &[String]) {
     let (mut imported, mut updated, mut unchanged, mut skipped) = (0, 0, 0, 0);
     let mut skipped_names: Vec<String> = Vec::new();
     let mut wdirs: Vec<String> = fs::read_dir(&mem)
-        .map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect())
+        .map(|rd| {
+            rd.flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
         .unwrap_or_default();
     wdirs.sort();
     for w in wdirs {
         let pdir = format!("{mem}/{w}/projects");
-        let Ok(rd) = fs::read_dir(&pdir) else { continue };
-        let mut names: Vec<String> = rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        let Ok(rd) = fs::read_dir(&pdir) else {
+            continue;
+        };
+        let mut names: Vec<String> = rd
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
         names.sort();
         for name in names {
             let pf = format!("{pdir}/{name}/.project-path");

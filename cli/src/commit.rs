@@ -29,8 +29,17 @@ fn is_log_date_line(rest: &str) -> bool {
         return false;
     }
     let digit = |i: usize| b[i].is_ascii_digit();
-    digit(0) && digit(1) && digit(2) && digit(3) && b[4] == b'-' && digit(5) && digit(6)
-        && b[7] == b'-' && digit(8) && digit(9) && b[10] == b' '
+    digit(0)
+        && digit(1)
+        && digit(2)
+        && digit(3)
+        && b[4] == b'-'
+        && digit(5)
+        && digit(6)
+        && b[7] == b'-'
+        && digit(8)
+        && digit(9)
+        && b[10] == b' '
 }
 
 /// True when the staged change of a task file only appends log-like lines.
@@ -70,7 +79,10 @@ fn pair_task_moves(lines: &[Vec<String>]) -> Vec<Vec<String>> {
         if !fname.starts_with("T-") {
             return None;
         }
-        let digits: String = fname[2..].chars().take_while(|c| c.is_ascii_digit()).collect();
+        let digits: String = fname[2..]
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
         if digits.is_empty() {
             return None;
         }
@@ -297,6 +309,9 @@ mod tests {
         ];
         let o = pair_task_moves(&l);
         assert_eq!(o.len(), 1);
-        assert_eq!(o[0], vec!["R", "w/00_backlog/T-0001-a.md", "w/11_done/T-0001-a.md"]);
+        assert_eq!(
+            o[0],
+            vec!["R", "w/00_backlog/T-0001-a.md", "w/11_done/T-0001-a.md"]
+        );
     }
 }

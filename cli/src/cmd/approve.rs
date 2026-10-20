@@ -36,7 +36,13 @@ pub fn cmd_approve(args: &[String]) -> i32 {
     match folder.as_str() {
         "03_brainstorming" | "04_spec_review" => {
             // Spec approved: the agent goes on with writing-plans in its own session.
-            move_task(&f, "05_planning", "task", "spec approved — planning starts now", "");
+            move_task(
+                &f,
+                "05_planning",
+                "task",
+                "spec approved — planning starts now",
+                "",
+            );
             store_commit();
             println!("start");
             return 0;
@@ -50,13 +56,23 @@ pub fn cmd_approve(args: &[String]) -> i32 {
         "06_plan_review" => {}
         "07_approved" => {
             if !now {
-                die(format!("{tid} is in {folder}; approve applies to {ALLOWED}"));
+                die(format!(
+                    "{tid} is in {folder}; approve applies to {ALLOWED}"
+                ));
             }
         }
-        _ => die(format!("{tid} is in {folder}; approve applies to {ALLOWED}")),
+        _ => die(format!(
+            "{tid} is in {folder}; approve applies to {ALLOWED}"
+        )),
     }
     if now {
-        let moved = move_task(&f, "08_implementing", "task", "plan approved — implementation starts now", "");
+        let moved = move_task(
+            &f,
+            "08_implementing",
+            "task",
+            "plan approved — implementation starts now",
+            "",
+        );
         store_commit();
         println!("start");
         // From 06 the agent is in its own turn and goes on with the implementation.
@@ -66,7 +82,13 @@ pub fn cmd_approve(args: &[String]) -> i32 {
         }
     } else {
         // The worker (task run --once) starts it when automation is on and a slot is free.
-        move_task(&f, "07_approved", "task", "plan approved — waiting for the worker", "");
+        move_task(
+            &f,
+            "07_approved",
+            "task",
+            "plan approved — waiting for the worker",
+            "",
+        );
         store_commit();
         println!("deferred");
     }

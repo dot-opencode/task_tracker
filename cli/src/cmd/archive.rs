@@ -38,7 +38,11 @@ fn mins(d: &str, t: &str) -> i64 {
 
 /// awk string-to-number: leading digits, else 0.
 fn leading_int(s: &str) -> i64 {
-    let digits: String = s.trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = s
+        .trim_start()
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     digits.parse().unwrap_or(0)
 }
 
@@ -190,9 +194,21 @@ pub fn archive_due(to_stderr: bool) -> usize {
     let mut n = 0;
     for (f, why) in due {
         if why == "import" {
-            move_task(&f, "archive", "task", "archived (already archived in ai_task_tracker)", "");
+            move_task(
+                &f,
+                "archive",
+                "task",
+                "archived (already archived in ai_task_tracker)",
+                "",
+            );
         } else {
-            move_task(&f, "archive", "task", &format!("archived after {days} days in done"), "");
+            move_task(
+                &f,
+                "archive",
+                "task",
+                &format!("archived after {days} days in done"),
+                "",
+            );
         }
         n += 1;
     }
@@ -244,7 +260,9 @@ pub fn cmd_archive(args: &[String]) -> i32 {
     let tid = normalize_id(&id).unwrap();
     let from = folder_of_file(&f);
     if from != "11_done" {
-        die(format!("{tid} is in {from}; only done tasks can be archived"));
+        die(format!(
+            "{tid} is in {from}; only done tasks can be archived"
+        ));
     }
     move_task(&f, "archive", "task", "archived", "");
     store_commit();
@@ -276,7 +294,10 @@ mod tests {
 
     #[test]
     fn minutes() {
-        assert_eq!(mins("1970-01-02", "01:30") - mins("1970-01-01", "00:00"), 1440 + 90);
+        assert_eq!(
+            mins("1970-01-02", "01:30") - mins("1970-01-01", "00:00"),
+            1440 + 90
+        );
         assert!(mins("2026-10-02", "00:00") > mins("2026-10-01", "23:59"));
     }
 

@@ -14,13 +14,18 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn mr_debug(msg: &str) {
-    if std::env::var("AGENT_TASKS_DEBUG").map(|v| !v.is_empty()).unwrap_or(false) {
+    if std::env::var("AGENT_TASKS_DEBUG")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false)
+    {
         warn(format!("mrcheck: {msg}"));
     }
 }
 
 fn have_cmd(name: &str) -> bool {
-    let Ok(path) = std::env::var("PATH") else { return false };
+    let Ok(path) = std::env::var("PATH") else {
+        return false;
+    };
     path.split(':').any(|d| {
         let d = if d.is_empty() { "." } else { d };
         let p = format!("{d}/{name}");
@@ -79,12 +84,18 @@ fn mr_run(args: &[&str], envs: &[(&str, &str)]) -> Option<String> {
 
 fn json_state(out: Option<String>) -> String {
     out.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
-        .and_then(|v| v.get("state").and_then(|s| s.as_str().map(|s| s.to_string())))
+        .and_then(|v| {
+            v.get("state")
+                .and_then(|s| s.as_str().map(|s| s.to_string()))
+        })
         .unwrap_or_default()
 }
 
 fn leading_digits(s: &str) -> &str {
-    let end = s.bytes().position(|b| !b.is_ascii_digit()).unwrap_or(s.len());
+    let end = s
+        .bytes()
+        .position(|b| !b.is_ascii_digit())
+        .unwrap_or(s.len());
     &s[..end]
 }
 
@@ -165,7 +176,10 @@ fn mr_check_run(force: bool) {
         }
     }
     let _ = fs::create_dir_all(format!("{st}/.notify"));
-    let _ = fs::write(format!("{st}/.notify/mrcheck.last"), format!("{}\n", epoch_now()));
+    let _ = fs::write(
+        format!("{st}/.notify/mrcheck.last"),
+        format!("{}\n", epoch_now()),
+    );
     if files.is_empty() {
         if force {
             println!("no unmerged tasks with a pr link");

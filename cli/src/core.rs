@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.3.0";
 
 pub const FOLDERS: [&str; 15] = [
     "00_backlog",
@@ -110,8 +110,14 @@ pub fn task_root() -> String {
     String::new()
 }
 
-/// The shim that re-invokes the CLI (what bash called TASK_BIN).
+/// The launcher that re-invokes the CLI (what bash called TASK_BIN). The launcher
+/// exports AGENT_TASKS_SELF; the cached binary itself is never re-invoked directly.
 pub fn task_bin() -> String {
+    if let Ok(v) = std::env::var("AGENT_TASKS_SELF") {
+        if !v.is_empty() {
+            return v;
+        }
+    }
     format!("{}/bin/task", task_root())
 }
 
@@ -397,7 +403,9 @@ pub fn ensure_store() {
     }
     let ws = config_get("default_workspace", "work");
     if !valid_ws(&ws) {
-        die(format!("invalid default_workspace '{ws}' in {st}/config.toml"));
+        die(format!(
+            "invalid default_workspace '{ws}' in {st}/config.toml"
+        ));
     }
     ensure_workspace(&ws);
     if fresh {
@@ -576,7 +584,9 @@ pub fn oldest_tasks_in(with_session: bool, folders: &[&str]) -> Vec<String> {
                 if with_session && crate::frontmatter::fm_get(&f, "session").is_empty() {
                     continue;
                 }
-                let t = fs::metadata(&f).map(|m| (m.ctime(), m.ctime_nsec())).unwrap_or((0, 0));
+                let t = fs::metadata(&f)
+                    .map(|m| (m.ctime(), m.ctime_nsec()))
+                    .unwrap_or((0, 0));
                 list.push((t, f));
             }
         }

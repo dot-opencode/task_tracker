@@ -3,8 +3,8 @@
 //! `st_load` scans every task file once into an `St` index; the helpers read
 //! it. Call `st_load` again after files moved.
 
-use crate::core::{self, die, folder_of_file, id_of_file, read_file, store, task_file, ws_of_file};
 use crate::cmd::edit::move_task;
+use crate::core::{self, die, folder_of_file, id_of_file, read_file, store, task_file, ws_of_file};
 use crate::frontmatter::{fm_set, result_append};
 use std::collections::HashSet;
 
@@ -219,7 +219,10 @@ impl St {
                     out.push((me.rel.clone(), format!("parent {p} does not exist")));
                 } else {
                     if get(p).unwrap().ws != me.ws {
-                        out.push((me.rel.clone(), format!("parent {p} is in another workspace")));
+                        out.push((
+                            me.rel.clone(),
+                            format!("parent {p} is in another workspace"),
+                        ));
                     }
                     let mut x = p.clone();
                     let mut steps = 0;

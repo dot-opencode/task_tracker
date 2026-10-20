@@ -39,8 +39,22 @@ pub fn valid_calendar_date(date: &str) -> bool {
 }
 
 const KNOWN: [&str; 16] = [
-    "id", "title", "project", "created", "source", "session", "spec", "plan", "pr", "blocked_from",
-    "postponed_from", "result", "worktree", "legacy_id", "parent", "depends_on",
+    "id",
+    "title",
+    "project",
+    "created",
+    "source",
+    "session",
+    "spec",
+    "plan",
+    "pr",
+    "blocked_from",
+    "postponed_from",
+    "result",
+    "worktree",
+    "legacy_id",
+    "parent",
+    "depends_on",
 ];
 
 fn unq(v: &str) -> String {
@@ -102,15 +116,13 @@ fn doctor_scan(text: &str) -> Vec<Item> {
                 continue;
             }
             let b = line.as_bytes();
-            let shaped = !b.is_empty()
-                && (b[0].is_ascii_lowercase() || b[0] == b'_')
-                && {
-                    let key_len = b
-                        .iter()
-                        .take_while(|c| c.is_ascii_lowercase() || **c == b'_')
-                        .count();
-                    b.get(key_len) == Some(&b':')
-                };
+            let shaped = !b.is_empty() && (b[0].is_ascii_lowercase() || b[0] == b'_') && {
+                let key_len = b
+                    .iter()
+                    .take_while(|c| c.is_ascii_lowercase() || **c == b'_')
+                    .count();
+                b.get(key_len) == Some(&b':')
+            };
             if shaped {
                 let p = line.find(':').unwrap();
                 let after = line.as_bytes().get(p + 1).copied();
@@ -119,7 +131,11 @@ fn doctor_scan(text: &str) -> Vec<Item> {
                     continue;
                 }
                 let k = &line[..p];
-                let v = if line.len() > p + 2 { &line[p + 2..] } else { "" };
+                let v = if line.len() > p + 2 {
+                    &line[p + 2..]
+                } else {
+                    ""
+                };
                 if seen.iter().any(|s| s == k) {
                     out.push(Item::Problem(format!("duplicate key '{k}'")));
                 }
@@ -207,7 +223,11 @@ pub fn cmd_doctor(args: &[String]) -> i32 {
             add(&rel, &format!("invalid result '{f_result}'"));
         }
         if folder == "10_unmerged" && !matches!(f_result.as_str(), "pr" | "kept") {
-            let r = if f_result.is_empty() { "none" } else { &f_result };
+            let r = if f_result.is_empty() {
+                "none"
+            } else {
+                &f_result
+            };
             add(
                 &rel,
                 &format!("in 10_unmerged with result '{r}' (expected pr or kept)"),
@@ -229,7 +249,9 @@ pub fn cmd_doctor(args: &[String]) -> i32 {
         if folder != "blocked" && !f_blocked.is_empty() {
             add(&rel, "blocked_from outside blocked");
         }
-        if !f_blocked.is_empty() && (!FOLDERS.contains(&f_blocked.as_str()) || f_blocked == "blocked") {
+        if !f_blocked.is_empty()
+            && (!FOLDERS.contains(&f_blocked.as_str()) || f_blocked == "blocked")
+        {
             add(&rel, &format!("invalid blocked_from '{f_blocked}'"));
         }
         if folder == "postponed" && f_postponed.is_empty() {
@@ -279,7 +301,10 @@ pub fn cmd_doctor(args: &[String]) -> i32 {
             nproj += 1;
             let p = project_path(&ws_p, &name);
             if !Path::new(&p).is_dir() || p.is_empty() {
-                add(&format!("{ws_p}/.projects/{name}"), &format!("path does not exist: {p}"));
+                add(
+                    &format!("{ws_p}/.projects/{name}"),
+                    &format!("path does not exist: {p}"),
+                );
             }
         }
     }
@@ -342,7 +367,14 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(probs, vec!["unknown key 'bogus'", "duplicate key 'id'", "no ## Log section"]);
+        assert_eq!(
+            probs,
+            vec![
+                "unknown key 'bogus'",
+                "duplicate key 'id'",
+                "no ## Log section"
+            ]
+        );
         assert_eq!(unq("\"a\\\"b\""), "a\"b");
     }
 }

@@ -13,7 +13,10 @@ const LOGS_USAGE: &str = "usage: task logs [<id>] [-n N] [-f]";
 
 /// Also used by auto (launchd StandardOutPath / StandardErrorPath).
 pub fn worker_log_path() -> String {
-    format!("{}/Library/Logs/agent-tasks.log", std::env::var("HOME").unwrap_or_default())
+    format!(
+        "{}/Library/Logs/agent-tasks.log",
+        std::env::var("HOME").unwrap_or_default()
+    )
 }
 
 /// Non-empty lines after the `## Log` heading (looked up only after the closing frontmatter `---`).

@@ -78,7 +78,11 @@ pub fn cmd_bind(args: &[String]) -> i32 {
     if !on_path("opencode") {
         die("opencode not found on PATH");
     }
-    let notfound = || -> ! { die(format!("session {session} not found (is OpenCode running?)")) };
+    let notfound = || -> ! {
+        die(format!(
+            "session {session} not found (is OpenCode running?)"
+        ))
+    };
     let out = Command::new("opencode")
         .args(["api", "get", &format!("/api/session/{session}")])
         .stdin(Stdio::null())
@@ -108,7 +112,13 @@ pub fn cmd_bind(args: &[String]) -> i32 {
         }
     }
     let ok = Command::new("opencode")
-        .args(["api", "patch", &format!("/api/session/{session}"), "--data", &payload])
+        .args([
+            "api",
+            "patch",
+            &format!("/api/session/{session}"),
+            "--data",
+            &payload,
+        ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .status()

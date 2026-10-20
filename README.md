@@ -15,14 +15,54 @@ Folders: `00_backlog`, `01_ready`, `02_exploring`, `03_brainstorming`, `04_spec_
 
 ## Install
 
+### OpenCode package plugin (recommended)
+
 ```bash
-cd ~/work/task_tracker && cargo build --release   # builds the `task` binary used by bin/task
+opencode plugin add github:dot-opencode/task_tracker#release
+```
+
+The `release` branch moves only after a GitHub Release (and its pinned checksums) is published, so you get
+updates on releases only. Check and update with:
+
+```bash
+opencode plugin check      # is there a newer release?
+opencode plugin update     # fetch it; then restart OpenCode
+```
+
+The plugin registers the bundled `agent-tasks` skill. If a skill with the same name is already installed
+(for example via `npx skills`), that one wins. It also tells the agent the absolute path of the `task` CLI, so
+nothing needs to be on `PATH` for the agent.
+
+For your own shell, symlink the launcher. The package path changes on update, so use the path the plugin shows
+the agent:
+
+```bash
+ln -s <path-to-package>/skills/agent-tasks/bin/task ~/.local/bin/task
+task project import-memory    # register the projects agent-memory knows
+```
+
+`bin/task` is a small launcher. On first run it downloads the prebuilt binary pinned in `bin/release.txt` from
+GitHub Releases, checks its sha256 and caches it under `~/.cache/agent-tasks/` (`$XDG_CACHE_HOME` if set).
+Prebuilt binaries exist for macOS (arm64, x86_64) and Linux (x86_64, aarch64; static musl). Offline or on
+another platform, build it yourself and point the launcher at it:
+
+```bash
+cargo install --git https://github.com/dot-opencode/task_tracker agent-tasks
+export AGENT_TASKS_BIN="$HOME/.cargo/bin/task"
+```
+
+### From a checkout (development)
+
+```bash
+cd ~/work/task_tracker && cargo build --release
+export AGENT_TASKS_BIN="$PWD/target/release/task"
 ln -s ~/work/task_tracker/skills/agent-tasks ~/.agents/skills/agent-tasks
 ln -s ../../.agents/skills/agent-tasks ~/.claude/skills/agent-tasks   # Claude Code
 ln -s ~/work/task_tracker/skills/agent-tasks/bin/task ~/.local/bin/task
-task install-opencode       # install the OpenCode plugin (reload OpenCode to load it)
-task project import-memory    # register the projects agent-memory knows
 ```
+
+`task install-opencode` (symlinks the plugin into `~/.config/opencode/plugins`) still works but is
+**deprecated**: prefer `opencode plugin add`.
 
 The store is created on first use at `~/.agent-tasks` (override with `AGENT_TASKS_HOME`).
 
@@ -47,7 +87,7 @@ task project add api ~/work/api
 task doctor                   # check the store
 ```
 
-For OpenCode session signals, install the plugin with `task install-opencode`. Automation is off until you explicitly run `task auto on 3h`; turn it off with `task auto off`. Open a waiting session with `task open T-0001` or `task next`. The plugin handles task status changes from session signals.
+For OpenCode session signals, install the plugin (see Install). Automation is off until you explicitly run `task auto on 3h`; turn it off with `task auto off`. Open a waiting session with `task open T-0001` or `task next`. The plugin handles task status changes from session signals.
 
 To browse tasks inside the OpenCode TUI, enable the CLI plugin by adding its directory to `~/.config/opencode/cli.json`: `"plugins": ["/path/to/agent-tasks/skills/agent-tasks/opencode/tui"]`. Then `/tasks` (or the command palette, or `<leader>k`) opens a searchable task list grouped by "Waiting for you", "Agent working", "Queued", "Backlog", "Done"; Enter opens the task's session. In the dialog `alt+w` toggles waiting-only and `alt+p` includes postponed tasks. It runs `task ls --json` (`task` from PATH, else the bundled `bin/task`).
 
@@ -102,7 +142,8 @@ Task sessions use the OpenCode default model unless `config.toml` sets `preset` 
 
 ```bash
 cargo test                    # Rust unit tests
-cargo build --release && bash tests/run.sh   # CLI (SKIP_CARGO_BUILD=1 skips the build)
+cargo build --release && bash tests/run.sh   # CLI via the launcher + AGENT_TASKS_BIN (SKIP_CARGO_BUILD=1 skips the build)
+bash tests/launcher.sh        # launcher download/verify/cache, offline
 TZ=UTC node --test tests/     # plugin, RPC and TUI
 ```
 

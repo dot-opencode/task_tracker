@@ -2,13 +2,13 @@
 # Installing the OpenCode plugin. The plugin file itself is covered by
 # tests/plugin.test.js; these tests use a copy of the CLI with a placeholder plugin.
 
-# Copies bin/ into a fake repo ($TMP/repo/skills/agent-tasks, target/ linked to
-# the real build) with a stand-in opencode/agent-tasks.js.
+# Copies bin/ (the launcher) into a fake package ($TMP/repo/skills/agent-tasks;
+# AGENT_TASKS_BIN from tests/run.sh points at the real build) with a stand-in
+# opencode/agent-tasks.js.
 at_pkg() {
   AT_PKG="$TMP/repo/skills/agent-tasks"
   mkdir -p "$AT_PKG/opencode"
   cp -R "$ROOT/skills/agent-tasks/bin" "$AT_PKG/"
-  ln -s "$ROOT/target" "$TMP/repo/target"
   printf 'export default { id: "agent-tasks", setup() {} }\n' > "$AT_PKG/opencode/agent-tasks.js"
   AT_PKG_TASK="$AT_PKG/bin/task"
 }

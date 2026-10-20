@@ -43,11 +43,7 @@ pub fn run_api(method: &str, path: &str, data: Option<&str>) -> Option<String> {
     if let Some(d) = data {
         c.args(["--data", d]);
     }
-    let o = c
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()?;
+    let o = c.stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
     if o.status.success() {
         Some(String::from_utf8_lossy(&o.stdout).into_owned())
     } else {
@@ -74,7 +70,10 @@ fn run_mark_prompt(id: &str) {
 fn run_send_prompt(id: &str, session: &str, payload: Value) -> bool {
     let mut payload = payload;
     if let Value::Object(m) = &mut payload {
-        m.insert("metadata".into(), json!({"agent_tasks": {"automated": true}}));
+        m.insert(
+            "metadata".into(),
+            json!({"agent_tasks": {"automated": true}}),
+        );
     }
     run_mark_prompt(id);
     if run_api(
@@ -125,7 +124,11 @@ fn run_stale_check(active: &Value) {
             warn(format!("{id} has an invalid session field; skipped"));
             continue;
         }
-        if active.as_object().map(|o| o.contains_key(&s)).unwrap_or(false) {
+        if active
+            .as_object()
+            .map(|o| o.contains_key(&s))
+            .unwrap_or(false)
+        {
             continue;
         }
         let mtime = fs::metadata(&f).map(|m| m.mtime()).unwrap_or(0);
@@ -188,11 +191,20 @@ fn run_continue(file: &str) {
         run_block(&id, &format!("{id} has an invalid session field"));
         return;
     }
-    move_task(&f, "08_implementing", "task", "implementation starts (active period)", "");
+    move_task(
+        &f,
+        "08_implementing",
+        "task",
+        "implementation starts (active period)",
+        "",
+    );
     store_commit();
     lock_release();
     if !run_send_implement(&id, &s) {
-        run_block(&id, &format!("could not send the implementation prompt to session {s}"));
+        run_block(
+            &id,
+            &format!("could not send the implementation prompt to session {s}"),
+        );
         return;
     }
     run_say(format!("{id}: 07_approved → 08_implementing (session {s})"));
@@ -271,11 +283,19 @@ fn run_start(file: &str) {
     if let Some(m) = model_ref {
         body.insert("model".into(), m);
     }
-    let resp = run_api("post", "/api/session", Some(&Value::Object(body).to_string()))
-        .unwrap_or_default();
+    let resp = run_api(
+        "post",
+        "/api/session",
+        Some(&Value::Object(body).to_string()),
+    )
+    .unwrap_or_default();
     let s = serde_json::from_str::<Value>(&resp)
         .ok()
-        .and_then(|v| v.pointer("/data/id").and_then(|x| x.as_str()).map(String::from))
+        .and_then(|v| {
+            v.pointer("/data/id")
+                .and_then(|x| x.as_str())
+                .map(String::from)
+        })
         .unwrap_or_default();
     if !valid_session(&s) {
         run_block(&id, "could not create an OpenCode session");
@@ -286,7 +306,9 @@ fn run_start(file: &str) {
     let f = task_file(&id);
     if folder_of_file(&f) != "01_ready" {
         lock_release();
-        run_say(format!("{id}: left 01_ready meanwhile; session {s} is unused"));
+        run_say(format!(
+            "{id}: left 01_ready meanwhile; session {s} is unused"
+        ));
         return;
     }
     let old = fm_get(&f, "session");
@@ -296,7 +318,13 @@ fn run_start(file: &str) {
     if fm_set(&f, "session", &s).is_err() {
         die(format!("cannot update {f}"));
     }
-    let f = move_task(&f, "02_exploring", "task", &format!("started session {s}"), "");
+    let f = move_task(
+        &f,
+        "02_exploring",
+        "task",
+        &format!("started session {s}"),
+        "",
+    );
     store_commit();
     lock_release();
 
@@ -313,7 +341,10 @@ fn run_start(file: &str) {
         "delivery": "queue"
     });
     if !run_send_prompt(&id, &s, payload) {
-        run_block(&id, &format!("could not send the first prompt to session {s}"));
+        run_block(
+            &id,
+            &format!("could not send the first prompt to session {s}"),
+        );
         return;
     }
     run_say(format!("{id}: 01_ready → 02_exploring (session {s})"));

@@ -74,7 +74,8 @@ pub fn move_task(file: &str, folder: &str, author: &str, reason: &str, result: &
 
 pub fn cmd_mv(args: &[String]) -> i32 {
     const USAGE: &str = "usage: task mv <id> <folder> [--reason TEXT] [--force]";
-    let (mut id, mut fol, mut reason, mut force) = (String::new(), String::new(), String::new(), false);
+    let (mut id, mut fol, mut reason, mut force) =
+        (String::new(), String::new(), String::new(), false);
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -104,7 +105,11 @@ pub fn cmd_mv(args: &[String]) -> i32 {
         die(USAGE);
     }
     let folder = resolve_folder(&fol).unwrap_or_else(|| {
-        die(format!("unknown folder '{}' (folders: {})", fol, folders_str()))
+        die(format!(
+            "unknown folder '{}' (folders: {})",
+            fol,
+            folders_str()
+        ))
     });
     if !single_line(&reason) {
         die("reason must be a single line");
@@ -195,7 +200,16 @@ pub fn cmd_set(args: &[String]) -> i32 {
     let (id, key) = (a[0].clone(), a[1].clone());
     if !matches!(
         key.as_str(),
-        "title" | "project" | "source" | "session" | "spec" | "plan" | "pr" | "result" | "parent" | "depends_on"
+        "title"
+            | "project"
+            | "source"
+            | "session"
+            | "spec"
+            | "plan"
+            | "pr"
+            | "result"
+            | "parent"
+            | "depends_on"
     ) {
         die(format!(
             "cannot set '{key}' (keys: title project source session spec plan pr result parent depends_on); links go to source (ticket), pr (MR/PR), spec or plan (docs)"
@@ -222,7 +236,10 @@ pub fn cmd_set(args: &[String]) -> i32 {
             }
         }
         "result" if !valid_result(&val) => {
-            die(format!("invalid result '{val}' (one of: {})", results_str()));
+            die(format!(
+                "invalid result '{val}' (one of: {})",
+                results_str()
+            ));
         }
         _ => {}
     }
@@ -273,7 +290,16 @@ pub fn cmd_unset(args: &[String]) -> i32 {
     let (id, key) = (&args[0], &args[1]);
     if !matches!(
         key.as_str(),
-        "project" | "source" | "session" | "spec" | "plan" | "pr" | "result" | "worktree" | "parent" | "depends_on"
+        "project"
+            | "source"
+            | "session"
+            | "spec"
+            | "plan"
+            | "pr"
+            | "result"
+            | "worktree"
+            | "parent"
+            | "depends_on"
     ) {
         die(format!(
             "cannot unset '{key}' (keys: project source session spec plan pr result worktree parent depends_on)"
@@ -333,7 +359,10 @@ pub fn cmd_done(args: &[String]) -> i32 {
         die(format!("task done requires --result ({})", results_str()));
     }
     if !valid_result(&result) {
-        die(format!("invalid result '{result}' (one of: {})", results_str()));
+        die(format!(
+            "invalid result '{result}' (one of: {})",
+            results_str()
+        ));
     }
     if have_summary {
         summary = read_text_arg(&summary);

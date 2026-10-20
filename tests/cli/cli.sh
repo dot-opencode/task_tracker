@@ -2,8 +2,8 @@
 # Task 1: entry point.
 
 test_cli_version() {
-  assert_eq "$("$TASK" --version)" "task 0.2.0"
-  assert_eq "$("$TASK" -v)" "task 0.2.0"
+  assert_eq "$("$TASK" --version)" "task 0.3.0"
+  assert_eq "$("$TASK" -v)" "task 0.3.0"
 }
 
 test_cli_help_lists_commands() {
@@ -68,5 +68,5 @@ test_cli_no_arguments_prints_usage_to_stderr() {
 
 test_cli_works_through_symlink() {
   ln -s "$TASK" "$TMP/bin/task"
-  assert_eq "$(task --version)" "task 0.2.0"
+  assert_eq "$(task --version)" "task 0.3.0"
 }

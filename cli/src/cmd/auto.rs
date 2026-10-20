@@ -126,7 +126,7 @@ pub fn fmt_duration(s: i64) -> String {
 
 fn tm_of(epoch: i64) -> libc::tm {
     unsafe {
-        let t = epoch as libc::time_t;
+        let t = epoch as _;
         let mut tm: libc::tm = std::mem::zeroed();
         libc::localtime_r(&t, &mut tm);
         tm
@@ -136,7 +136,12 @@ fn tm_of(epoch: i64) -> libc::tm {
 /// epoch → HH:MM today, else YYYY-MM-DD HH:MM
 pub fn fmt_until(epoch: i64) -> String {
     let tm = tm_of(epoch);
-    let ymd = format!("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+    let ymd = format!(
+        "{:04}-{:02}-{:02}",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday
+    );
     if ymd == date_ymd() {
         format!("{:02}:{:02}", tm.tm_hour, tm.tm_min)
     } else {
@@ -145,7 +150,9 @@ pub fn fmt_until(epoch: i64) -> String {
 }
 
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// awk's gsub replacement: `&` in the value would be the matched text; the

@@ -35,7 +35,8 @@ Agents postpone or resume tasks only when the user asks (`task postpone <id> [--
 ## The `task` CLI
 
 Use `task` from PATH if installed; otherwise call the script that ships with this skill,
-`<this skill's directory>/bin/task`. `task --help` lists every command. Ids can be written
+`<this skill's directory>/bin/task`. If `task` is not on PATH (plugin install), use the absolute path
+given in the `<agent-tasks-cli>` block wherever this skill says `task`. `task --help` lists every command. Ids can be written
 `T-0083`, `t-83` or `83`.
 
 Every read and change goes through the CLI. **Never edit, write or move task files yourself** — no

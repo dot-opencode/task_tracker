@@ -35,7 +35,11 @@ fn git_in(dir: &str, args: &[&str]) -> Option<String> {
     if !out.status.success() {
         return None;
     }
-    Some(String::from_utf8_lossy(&out.stdout).trim_end_matches('\n').to_string())
+    Some(
+        String::from_utf8_lossy(&out.stdout)
+            .trim_end_matches('\n')
+            .to_string(),
+    )
 }
 
 /// Registered worktree: the directory exists and git recognises it.
@@ -54,7 +58,11 @@ pub fn worktree_cleanup(file: &str, result: &str, force: bool) {
     }
     let repo = worktree_repo(file);
     if repo.is_empty() || !Path::new(&repo).is_dir() {
-        log_append(file, "task", &format!("worktree kept: project repository not found for {wt}"));
+        log_append(
+            file,
+            "task",
+            &format!("worktree kept: project repository not found for {wt}"),
+        );
         return;
     }
     if !Path::new(&wt).is_dir() {
@@ -63,8 +71,16 @@ pub fn worktree_cleanup(file: &str, result: &str, force: bool) {
         log_append(file, "task", &format!("worktree {wt} already gone"));
         return;
     }
-    if !force && !git_in(&wt, &["status", "--porcelain"]).unwrap_or_default().is_empty() {
-        log_append(file, "task", &format!("worktree kept: uncommitted changes in {wt}"));
+    if !force
+        && !git_in(&wt, &["status", "--porcelain"])
+            .unwrap_or_default()
+            .is_empty()
+    {
+        log_append(
+            file,
+            "task",
+            &format!("worktree kept: uncommitted changes in {wt}"),
+        );
         return;
     }
     let branch = git_in(&wt, &["symbolic-ref", "--short", "-q", "HEAD"]).unwrap_or_default();
@@ -89,14 +105,25 @@ pub fn worktree_cleanup(file: &str, result: &str, force: bool) {
                 Err(e) => e.to_string(),
             };
             let first = msg.split('\n').next().unwrap_or("");
-            log_append(file, "task", &format!("worktree kept: cannot remove {wt}: {first}"));
+            log_append(
+                file,
+                "task",
+                &format!("worktree kept: cannot remove {wt}: {first}"),
+            );
             return;
         }
     }
     let _ = fm_unset(file, "worktree");
     log_append(file, "task", &format!("worktree removed: {wt}"));
-    if result == "merged" && !branch.is_empty() && git_in(&repo, &["branch", "-d", &branch]).is_none() {
-        log_append(file, "task", &format!("branch {branch} kept (not merged locally)"));
+    if result == "merged"
+        && !branch.is_empty()
+        && git_in(&repo, &["branch", "-d", &branch]).is_none()
+    {
+        log_append(
+            file,
+            "task",
+            &format!("branch {branch} kept (not merged locally)"),
+        );
     }
 }
 
@@ -164,7 +191,9 @@ pub fn cmd_worktree(args: &[String]) -> i32 {
     }
 
     if fm_get(&f, "project").is_empty() {
-        die(format!("{tid} has no project; run: task set {tid} project <name>"));
+        die(format!(
+            "{tid} has no project; run: task set {tid} project <name>"
+        ));
     }
     let repo = worktree_repo(&f);
     if repo.is_empty() {
@@ -196,7 +225,12 @@ pub fn cmd_worktree(args: &[String]) -> i32 {
         if git_in(&repo, &["check-ignore", "-q", ".worktrees"]).is_none() {
             let excl = git_in(
                 &repo,
-                &["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"],
+                &[
+                    "rev-parse",
+                    "--path-format=absolute",
+                    "--git-path",
+                    "info/exclude",
+                ],
             )
             .unwrap_or_else(|| die("cannot locate git exclude file"));
             let _ = fs::create_dir_all(dirname(&excl));
@@ -221,8 +255,16 @@ pub fn cmd_worktree(args: &[String]) -> i32 {
                 format!("task/{tid}-{slug}")
             };
         }
-        let exists = git_in(&repo, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")])
-            .is_some();
+        let exists = git_in(
+            &repo,
+            &[
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/heads/{branch}"),
+            ],
+        )
+        .is_some();
         let mut a: Vec<&str> = vec!["-C", &repo, "worktree", "add", "-q"];
         if exists {
             a.push(&wt);

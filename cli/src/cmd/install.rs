@@ -6,6 +6,12 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 
+fn deprecated() {
+    eprintln!(
+        "task: install-opencode is deprecated; prefer `opencode plugin add github:dot-opencode/task_tracker#release`"
+    );
+}
+
 pub fn cmd_install_opencode(args: &[String]) -> i32 {
     if !args.is_empty() {
         die("usage: task install-opencode");
@@ -22,12 +28,17 @@ pub fn cmd_install_opencode(args: &[String]) -> i32 {
     let destination = format!("{config_dir}/agent-tasks.js");
     let _ = fs::create_dir_all(&config_dir);
     let dp = Path::new(&destination);
-    if dp.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+    if dp
+        .symlink_metadata()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+    {
         // A dangling link is replaced.
         let current = fs::canonicalize(dp)
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_default();
         if current == source {
+            deprecated();
             println!("OpenCode plugin already installed: {destination}");
             return 0;
         }
@@ -38,6 +49,7 @@ pub fn cmd_install_opencode(args: &[String]) -> i32 {
     if symlink(&source, dp).is_err() {
         die(format!("cannot create symlink {destination}"));
     }
+    deprecated();
     println!(
         "installed OpenCode plugin: {destination} (run 'opencode reload' or restart OpenCode)"
     );

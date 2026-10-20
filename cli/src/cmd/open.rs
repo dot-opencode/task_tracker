@@ -238,7 +238,11 @@ pub fn cmd_open(args: &[String]) -> i32 {
     if !on_path("opencode") {
         die("opencode not found on PATH");
     }
-    let notfound = || -> ! { die(format!("session {session} not found (is OpenCode running?)")) };
+    let notfound = || -> ! {
+        die(format!(
+            "session {session} not found (is OpenCode running?)"
+        ))
+    };
     let resp = match Command::new("opencode")
         .args(["api", "get", &format!("/api/session/{session}")])
         .stdin(Stdio::null())

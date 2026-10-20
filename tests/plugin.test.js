@@ -1,6 +1,8 @@
 // Run: node --test tests/plugin.test.js
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import test from "node:test"
 
 import {
@@ -604,4 +606,93 @@ test("M10: the plugin's setup returns a plain cleanup function", async () => {
   assert.equal(typeof stop, "function")
   assert.equal(stop.idle, undefined)
   stop()
+})
+
+// ---------------------------------------------------------------- bundled skill + CLI path
+
+function skillCtx({ existing = [], fail = false } = {}) {
+  const env = contextFor({ sessions: BOUND, events: deferredEvents() })
+  const added = []
+  const state = { disposed: 0 }
+  env.ctx.skill = {
+    transform: async (fn) => {
+      if (fail) throw new Error("boom")
+      fn({ get: (id) => (existing.includes(id) ? {} : undefined), add: (info) => void added.push(info) })
+      return { dispose: () => void (state.disposed += 1) }
+    },
+  }
+  return { ...env, added, state }
+}
+
+async function skillFiles() {
+  const dir = await mkdtemp(join(tmpdir(), "agent-tasks-skills-"))
+  const a = join(dir, "a.md")
+  const b = join(dir, "b.md")
+  await writeFile(a, "---\nname: one\ndescription: Desc A\n---\n\n# A\nbody\n")
+  await writeFile(b, "---\nname: two\ndescription: Desc B\n---\n\n# B\nbody\n")
+  return [{ id: "one", path: a }, { id: "two", path: b }, { id: "gone", path: join(dir, "missing.md") }]
+}
+
+test("registers bundled skills via ctx.skill.transform and disposes them", async () => {
+  const w = skillCtx()
+  const skills = await skillFiles()
+  const stop = await reg(w.ctx, { ...w.deps, skills })
+  assert.deepEqual(w.added.map((s) => s.id), ["one", "two"])
+  assert.deepEqual(w.added[0], { id: "one", name: "one", description: "Desc A", path: skills[0].path, content: "# A\nbody" })
+  stop()
+  assert.equal(w.state.disposed, 1)
+})
+
+test("skips a bundled skill that already exists", async () => {
+  const w = skillCtx({ existing: ["one"] })
+  const stop = await reg(w.ctx, { ...w.deps, skills: await skillFiles() })
+  assert.deepEqual(w.added.map((s) => s.id), ["two"])
+  stop()
+})
+
+test("skill registration failures never throw", async () => {
+  const w = skillCtx({ fail: true })
+  const stop = await reg(w.ctx, { ...w.deps, skills: await skillFiles() })
+  stop()
+  const w2 = skillCtx()
+  delete w2.ctx.skill
+  const stop2 = await reg(w2.ctx, { ...w2.deps, skills: await skillFiles() })
+  stop2()
+})
+
+test("the real SKILL.md registers with frontmatter stripped", async () => {
+  const w = skillCtx()
+  const path = new URL("../skills/agent-tasks/SKILL.md", import.meta.url).pathname
+  const stop = await reg(w.ctx, { ...w.deps, skills: [{ id: "agent-tasks", path }] })
+  assert.deepEqual(w.added.map((s) => s.id), ["agent-tasks"])
+  assert.ok(w.added[0].description.length > 10)
+  assert.ok(!w.added[0].content.startsWith("---"))
+  stop()
+})
+
+test("context hook tells the agent the absolute CLI path, once, even for unbound sessions", async () => {
+  const events = deferredEvents()
+  const env = contextFor({ sessions: { ...BOUND, ses_free: {} }, events })
+  const stop = await reg(env.ctx, { ...env.deps, taskCli: "/pkg/skills/agent-tasks/bin/task" })
+  const free = { sessionID: "ses_free", system: [] }
+  await env.ctx.hooks.get("context")(free)
+  await env.ctx.hooks.get("context")(free)
+  assert.equal(free.system.length, 1)
+  assert.match(free.system[0].text, /<agent-tasks-cli>[\s\S]*`\/pkg\/skills\/agent-tasks\/bin\/task`/)
+  const bound = { sessionID: "ses_root", system: [] }
+  await env.ctx.hooks.get("context")(bound)
+  assert.equal(bound.system.length, 2)
+  assert.ok(bound.system[1].text.includes("<agent-tasks>"))
+  stop()
+})
+
+test("entrypoint is a dependency-free native V2 plugin object", async () => {
+  const url = new URL("../skills/agent-tasks/opencode/agent-tasks.js", import.meta.url)
+  const source = await readFile(url, "utf8")
+  for (const [, specifier] of source.matchAll(/^import\s.*?from\s+["']([^"']+)["']/gm)) {
+    assert.ok(specifier.startsWith("node:") || specifier.startsWith("./"), `non-bundled import: ${specifier}`)
+  }
+  const { default: plugin } = await import(url)
+  assert.equal(plugin.id, "agent-tasks")
+  assert.equal(typeof plugin.setup, "function")
 })

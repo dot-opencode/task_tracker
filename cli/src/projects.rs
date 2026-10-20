@@ -73,8 +73,8 @@ fn pwd_p() -> String {
 /// Current directory, but a git worktree maps to the same place in its main checkout.
 pub fn cwd_equivalent() -> String {
     let here = pwd_p();
-    let common = git_cwd(&["rev-parse", "--path-format=absolute", "--git-common-dir"])
-        .unwrap_or_default();
+    let common =
+        git_cwd(&["rev-parse", "--path-format=absolute", "--git-common-dir"]).unwrap_or_default();
     let Some(parent_raw) = common.strip_suffix("/.git") else {
         return here;
     };

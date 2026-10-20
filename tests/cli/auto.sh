@@ -13,18 +13,25 @@ test_auto_on_without_duration() {
   assert_contains "$(sed -n 2p "$AGENT_TASKS_HOME/.auto")" "since="
   plist="$HOME/$AT_PLIST_REL"
   assert_file "$plist"
-  plutil -lint "$plist" >/dev/null || fail "plist is not valid"
-  assert_eq "$(plutil -extract Label raw "$plist")" "agent-tasks.run"
-  assert_eq "$(plutil -extract ProgramArguments.0 raw "$plist")" "$ROOT/skills/agent-tasks/bin/task"
-  assert_eq "$(plutil -extract ProgramArguments.1 raw "$plist") $(plutil -extract ProgramArguments.2 raw "$plist")" "run --once"
-  assert_eq "$(plutil -extract StartInterval raw "$plist")" 60
-  assert_eq "$(plutil -extract RunAtLoad raw "$plist")" true
-  assert_eq "$(plutil -extract ProcessType raw "$plist")" Background
-  assert_eq "$(plutil -extract EnvironmentVariables.PATH raw "$plist")" \
-    "$HOME/.opencode/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-  assert_eq "$(plutil -extract EnvironmentVariables.AGENT_TASKS_HOME raw "$plist")" "$AGENT_TASKS_HOME"
-  assert_eq "$(plutil -extract StandardOutPath raw "$plist")" "$HOME/Library/Logs/agent-tasks.log"
-  assert_eq "$(plutil -extract StandardErrorPath raw "$plist")" "$HOME/Library/Logs/agent-tasks.log"
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -lint "$plist" >/dev/null || fail "plist is not valid"
+    assert_eq "$(plutil -extract Label raw "$plist")" "agent-tasks.run"
+    assert_eq "$(plutil -extract ProgramArguments.0 raw "$plist")" "$ROOT/skills/agent-tasks/bin/task"
+    assert_eq "$(plutil -extract ProgramArguments.1 raw "$plist") $(plutil -extract ProgramArguments.2 raw "$plist")" "run --once"
+    assert_eq "$(plutil -extract StartInterval raw "$plist")" 60
+    assert_eq "$(plutil -extract RunAtLoad raw "$plist")" true
+    assert_eq "$(plutil -extract ProcessType raw "$plist")" Background
+    assert_eq "$(plutil -extract EnvironmentVariables.PATH raw "$plist")" \
+      "$HOME/.opencode/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+    assert_eq "$(plutil -extract EnvironmentVariables.AGENT_TASKS_HOME raw "$plist")" "$AGENT_TASKS_HOME"
+    assert_eq "$(plutil -extract StandardOutPath raw "$plist")" "$HOME/Library/Logs/agent-tasks.log"
+    assert_eq "$(plutil -extract StandardErrorPath raw "$plist")" "$HOME/Library/Logs/agent-tasks.log"
+  else
+    # No plutil off macOS: check the rendered values textually.
+    assert_contains "$(cat "$plist")" "<string>$ROOT/skills/agent-tasks/bin/task</string>"
+    assert_contains "$(cat "$plist")" "<string>agent-tasks.run</string>"
+    assert_contains "$(cat "$plist")" "<string>$AGENT_TASKS_HOME</string>"
+  fi
   assert_eq "$(cat "$TMP/launchctl.log")" "print gui/$(id -u)/agent-tasks.run
 bootstrap gui/$(id -u) $plist"
   assert_eq "$(git -C "$AGENT_TASKS_HOME" status --porcelain)" ""

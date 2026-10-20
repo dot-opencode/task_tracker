@@ -53,9 +53,14 @@ pub fn cmd_postpone(args: &[String]) -> i32 {
     log_append(&f, "task", &msg);
     store_commit();
     println!("{tid}: {from} → postponed (from {target})");
-    if matches!(from.as_str(), "02_exploring" | "05_planning" | "08_implementing") && !ses.is_empty()
+    if matches!(
+        from.as_str(),
+        "02_exploring" | "05_planning" | "08_implementing"
+    ) && !ses.is_empty()
     {
-        eprintln!("warning: session {ses} may still be running; stop it in OpenCode (task open {tid})");
+        eprintln!(
+            "warning: session {ses} may still be running; stop it in OpenCode (task open {tid})"
+        );
     }
     0
 }
