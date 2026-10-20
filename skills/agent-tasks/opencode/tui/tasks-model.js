@@ -1,7 +1,7 @@
 // Pure helpers for the /tasks dialog: JSON -> grouped, ordered select options.
 // Keep free of OpenCode and node-process APIs so `node --test` can exercise it.
 
-// Same set as WAITING_FOLDERS in skills/agent-tasks/lib/core.sh (by status name).
+// Same set as WAITING_FOLDERS in cli/src/core.rs (by status name).
 export const WAITING_STATUSES = ["brainstorming", "spec_review", "plan_review", "finishing", "blocked"]
 const WORKING_STATUSES = ["exploring", "planning", "implementing"]
 const QUEUED_STATUSES = ["ready", "approved"]

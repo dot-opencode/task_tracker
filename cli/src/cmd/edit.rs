@@ -221,10 +221,8 @@ pub fn cmd_set(args: &[String]) -> i32 {
                 die(format!("invalid session id '{val}'"));
             }
         }
-        "result" => {
-            if !valid_result(&val) {
-                die(format!("invalid result '{val}' (one of: {})", results_str()));
-            }
+        "result" if !valid_result(&val) => {
+            die(format!("invalid result '{val}' (one of: {})", results_str()));
         }
         _ => {}
     }

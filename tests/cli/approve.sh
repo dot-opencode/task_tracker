@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Spec approval (→ planning) and plan approval (→ implementing or the wait). Uses at_task / at_folder from signal.sh.
-# Approval while automation is on is tested in auto.sh (needs lib/auto.sh).
+# Approval while automation is on is tested in auto.sh.
 
 test_approve_spec_moves_to_planning_and_starts() {
   local fo f

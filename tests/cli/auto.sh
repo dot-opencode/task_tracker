@@ -143,7 +143,7 @@ test_auto_helpers() {
   assert_eq "$("$TASK" auto | head -n 1)" "automation: on, 1h30m left"
 }
 
-# task approve while automation is on (lib/approve.sh asks lib/auto.sh).
+# task approve while automation is on (approve asks auto).
 # Spec approval never waits for the active period; plan approval does.
 test_auto_approve_spec_always_starts_planning() {
   at_stubs

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- CLI rewritten in Rust (`cli/`, binary `task`); `bin/task` is a shim for `target/release/task`. Build with `cargo build --release`.
+- Removed the Bash libs and the `migrate-folders` / `migrate-unmerged` scripts.
+
 ## 0.2.0 — 2026-10-20
 
 First tagged release.

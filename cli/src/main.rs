@@ -115,11 +115,9 @@ fn real_main() -> i32 {
             print!("{USAGE}");
             return 0;
         }
-        "" => {
-            if args.is_empty() {
-                eprint!("{USAGE}");
-                return 1;
-            }
+        "" if args.is_empty() => {
+            eprint!("{USAGE}");
+            return 1;
         }
         _ => {}
     }

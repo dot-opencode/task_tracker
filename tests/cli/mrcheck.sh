@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# lib/mrcheck.sh: MR/PR state auto-check of 10_unmerged tasks.
+# mrcheck: MR/PR state auto-check of 10_unmerged tasks.
 
 mr_setup() {
   export AGENT_TASKS_MRCHECK=1

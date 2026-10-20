@@ -42,14 +42,6 @@ assert_not_contains() { case "$1" in *"$2"*) fail "unexpected '$2' in: $1" ;; *)
 assert_file() { [ -f "$1" ] || fail "missing file: $1"; }
 assert_no_file() { [ ! -e "$1" ] || fail "unexpected file: $1"; }
 
-# Sources a lib into the test shell; a missing file fails the test explicitly.
-load_lib() {
-  local f="$ROOT/skills/agent-tasks/lib/$1.sh"
-  [ -f "$f" ] || fail "missing lib: $1.sh"
-  # shellcheck source=/dev/null # lib chosen by name
-  . "$f"
-}
-
 last_subject() { git -C "$AGENT_TASKS_HOME" log -1 --format=%s; }
 last_body() { git -C "$AGENT_TASKS_HOME" log -1 --format=%b; }
 

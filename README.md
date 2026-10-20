@@ -1,7 +1,7 @@
 # agent-tasks
 
 A file-based task tracker for one developer's coding agents. No servers or databases — markdown
-files, folders, git, and one Bash script. Same conventions as
+files, folders, git, and one Rust CLI. Same conventions as
 [agent-memory](https://github.com/kurbezz/memory).
 
 A task is a markdown file in `~/.agent-tasks/<workspace>/<folder>/T-0083-<slug>.md`; its status is the
@@ -16,6 +16,7 @@ Folders: `00_backlog`, `01_ready`, `02_exploring`, `03_brainstorming`, `04_spec_
 ## Install
 
 ```bash
+cd ~/work/task_tracker && cargo build --release   # builds the `task` binary used by bin/task
 ln -s ~/work/task_tracker/skills/agent-tasks ~/.agents/skills/agent-tasks
 ln -s ../../.agents/skills/agent-tasks ~/.claude/skills/agent-tasks   # Claude Code
 ln -s ~/work/task_tracker/skills/agent-tasks/bin/task ~/.local/bin/task
@@ -100,7 +101,8 @@ Task sessions use the OpenCode default model unless `config.toml` sets `preset` 
 ## Tests
 
 ```bash
-bash tests/run.sh             # CLI
+cargo test                    # Rust unit tests
+cargo build --release && bash tests/run.sh   # CLI (SKIP_CARGO_BUILD=1 skips the build)
 TZ=UTC node --test tests/     # plugin, RPC and TUI
 ```
 

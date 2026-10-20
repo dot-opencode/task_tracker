@@ -65,11 +65,15 @@ pub fn fm_quote(v: &str) -> String {
         .unwrap_or(false);
     if first_ok && !v.contains(['"', '\\']) {
         let lower = v.to_ascii_lowercase();
-        if !matches!(
+        let reserved = matches!(
             lower.as_str(),
             "null" | "true" | "false" | "yes" | "no" | "on" | "off" | "~"
-        ) && !is_numberish(v)
-            && !(v.contains(": ") || v.contains(" #") || v.ends_with(':'))
+        );
+        if !reserved
+            && !is_numberish(v)
+            && !v.contains(": ")
+            && !v.contains(" #")
+            && !v.ends_with(':')
         {
             return v.to_string();
         }

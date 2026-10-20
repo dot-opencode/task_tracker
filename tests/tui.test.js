@@ -17,9 +17,9 @@ const SAMPLE = [
   T("T-0099", "archive", { folder: "archive" }),
 ]
 
-test("waiting statuses match WAITING_FOLDERS in core.sh", async () => {
-  const core = await readFile(new URL("../skills/agent-tasks/lib/core.sh", import.meta.url), "utf8")
-  const folders = core.match(/^WAITING_FOLDERS="([^"]*)"/m)[1].split(" ")
+test("waiting statuses match WAITING_FOLDERS in core.rs", async () => {
+  const core = await readFile(new URL("../cli/src/core.rs", import.meta.url), "utf8")
+  const folders = [...core.match(/WAITING_FOLDERS: \[&str; \d+\] = \[([^\]]*)\]/)[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
   const statuses = folders.map((f) => f.replace(/^\d+_/, ""))
   assert.deepEqual([...statuses].sort(), [...WAITING_STATUSES].sort())
 })

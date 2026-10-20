@@ -381,12 +381,9 @@ pub fn st_sweep() {
 /// Oldest task of the folders without blocked_by.
 pub fn oldest_unblocked_in(folders: &[&str]) -> Option<String> {
     let st = st_load();
-    for f in core::oldest_tasks_in(false, folders) {
-        if st.blocked_by(&id_of_file(&f)).is_empty() {
-            return Some(f);
-        }
-    }
-    None
+    core::oldest_tasks_in(false, folders)
+        .into_iter()
+        .find(|f| st.blocked_by(&id_of_file(f)).is_empty())
 }
 
 #[cfg(test)]
