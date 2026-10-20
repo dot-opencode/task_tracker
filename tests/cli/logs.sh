@@ -161,7 +161,8 @@ test_logs_rejects_bad_args() {
 
 # The plist path itself is asserted by the auto tests (unchanged).
 test_logs_helper_path_and_usage_text() {
-  load_lib logs
-  assert_eq "$(worker_log_path)" "$HOME/Library/Logs/agent-tasks.log"
+  # worker_log_path() is asserted by the Rust unit test and via `task logs` above.
+  logs_write_worker_log 1
+  assert_eq "$("$TASK" logs)" "worker line 1"
   assert_contains "$("$TASK" --help)" "task logs [<id>] [-n N] [-f]"
 }
