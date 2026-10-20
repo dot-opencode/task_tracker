@@ -2,12 +2,15 @@
 # Installing the OpenCode plugin. The plugin file itself is covered by
 # tests/plugin.test.js; these tests use a copy of the CLI with a placeholder plugin.
 
-# Copies bin/ and lib/ into $TMP/pkg with a stand-in opencode/agent-tasks.js.
+# Copies bin/ into a fake repo ($TMP/repo/skills/agent-tasks, target/ linked to
+# the real build) with a stand-in opencode/agent-tasks.js.
 at_pkg() {
-  mkdir -p "$TMP/pkg/opencode"
-  cp -R "$ROOT/skills/agent-tasks/bin" "$ROOT/skills/agent-tasks/lib" "$TMP/pkg/"
-  printf 'export default { id: "agent-tasks", setup() {} }\n' > "$TMP/pkg/opencode/agent-tasks.js"
-  AT_PKG_TASK="$TMP/pkg/bin/task"
+  AT_PKG="$TMP/repo/skills/agent-tasks"
+  mkdir -p "$AT_PKG/opencode"
+  cp -R "$ROOT/skills/agent-tasks/bin" "$AT_PKG/"
+  ln -s "$ROOT/target" "$TMP/repo/target"
+  printf 'export default { id: "agent-tasks", setup() {} }\n' > "$AT_PKG/opencode/agent-tasks.js"
+  AT_PKG_TASK="$AT_PKG/bin/task"
 }
 
 test_install_opencode_symlinks_plugin() {
@@ -17,9 +20,9 @@ test_install_opencode_symlinks_plugin() {
   out="$("$AT_PKG_TASK" install-opencode)"
   assert_eq "$out" "installed OpenCode plugin: $dest (run 'opencode reload' or restart OpenCode)"
   [ -L "$dest" ] || fail "not a symlink: $dest"
-  assert_eq "$(readlink "$dest")" "$TMP/pkg/opencode/agent-tasks.js"
+  assert_eq "$(readlink "$dest")" "$AT_PKG/opencode/agent-tasks.js"
   assert_eq "$("$AT_PKG_TASK" install-opencode)" "OpenCode plugin already installed: $dest"
-  assert_eq "$(readlink "$dest")" "$TMP/pkg/opencode/agent-tasks.js"
+  assert_eq "$(readlink "$dest")" "$AT_PKG/opencode/agent-tasks.js"
 }
 
 test_install_opencode_honours_xdg_and_replaces_stale_link() {
@@ -30,7 +33,7 @@ test_install_opencode_honours_xdg_and_replaces_stale_link() {
   mkdir -p "$(dirname "$dest")"
   ln -s "$TMP/old/agent-tasks.js" "$dest"
   assert_contains "$("$AT_PKG_TASK" install-opencode)" "installed OpenCode plugin: $dest"
-  assert_eq "$(readlink "$dest")" "$TMP/pkg/opencode/agent-tasks.js"
+  assert_eq "$(readlink "$dest")" "$AT_PKG/opencode/agent-tasks.js"
   assert_no_file "$HOME/.config/opencode"
 }
 
@@ -38,7 +41,7 @@ test_install_opencode_through_cli_symlink() {
   at_pkg
   ln -s "$AT_PKG_TASK" "$TMP/bin/task"
   task install-opencode >/dev/null
-  assert_eq "$(readlink "$HOME/.config/opencode/plugins/agent-tasks.js")" "$TMP/pkg/opencode/agent-tasks.js"
+  assert_eq "$(readlink "$HOME/.config/opencode/plugins/agent-tasks.js")" "$AT_PKG/opencode/agent-tasks.js"
 }
 
 test_install_opencode_refuses_regular_file() {
@@ -59,10 +62,10 @@ test_install_opencode_errors() {
   out="$("$AT_PKG_TASK" install-opencode now 2>&1)" || rc=$?
   assert_eq "$rc" 1
   assert_contains "$out" "usage: task install-opencode"
-  rm "$TMP/pkg/opencode/agent-tasks.js"
+  rm "$AT_PKG/opencode/agent-tasks.js"
   rc=0; out="$("$AT_PKG_TASK" install-opencode 2>&1)" || rc=$?
   assert_eq "$rc" 1
-  assert_eq "$out" "task: OpenCode plugin not found at $TMP/pkg/opencode/agent-tasks.js"
+  assert_eq "$out" "task: OpenCode plugin not found at $AT_PKG/opencode/agent-tasks.js"
   assert_no_file "$HOME/.config/opencode/plugins/agent-tasks.js"
 }
 
