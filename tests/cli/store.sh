@@ -157,31 +157,23 @@ test_store_config_get() {
 # retry" the second rm deletes the first waiter's fresh lock and two of them
 # enter the critical section, so the read-modify-write below loses updates.
 test_store_lock_stale_steal_is_exclusive() {
-  load_lib lock
-  # shellcheck disable=SC2329 # called by lock_acquire, which is sourced
-  die() { echo "task: $*" >&2; exit 1; }
-  STORE="$TMP/lockstore"
-  mkdir -p "$STORE"
-  local got
-  for _ in 1 2 3; do
-    mkdir "$STORE/.lock"
-    echo 999999 > "$STORE/.lock/pid"
-    echo 0 > "$TMP/counter"
-    for _ in 1 2 3 4 5 6 7 8; do
-      (
-        lock_acquire
-        c="$(cat "$TMP/counter")"
-        sleep 0.05
-        echo $((c + 1)) > "$TMP/counter"
-        lock_release
-      ) &
+  export AGENT_TASKS_LOCK_TIMEOUT=30
+  "$TASK" backup >/dev/null
+  local round i ids
+  for round in 1 2 3; do
+    mkdir "$AGENT_TASKS_HOME/.lock"
+    echo 999999 > "$AGENT_TASKS_HOME/.lock/pid"
+    for i in 1 2 3 4 5 6 7 8; do
+      "$TASK" new "Steal $round $i" >/dev/null 2>&1 &
     done
     wait
-    got="$(cat "$TMP/counter")"
-    assert_eq "$got" 8
-    assert_no_file "$STORE/.lock"
-    assert_no_file "$STORE/.lock.steal"
+    assert_no_file "$AGENT_TASKS_HOME/.lock"
+    assert_no_file "$AGENT_TASKS_HOME/.lock.steal"
   done
+  # two holders in the critical section would hand out the same id twice
+  ids="$(find "$AGENT_TASKS_HOME/work" -name 'T-*.md' | sed 's/.*\/\(T-[0-9]*\).*/\1/' | LC_ALL=C sort | uniq -d)"
+  assert_eq "$ids" ""
+  assert_eq "$(find "$AGENT_TASKS_HOME/work" -name 'T-*.md' | wc -l | tr -d ' ')" 24
 }
 
 test_store_lock_steal_dir_is_ignored_by_git() {

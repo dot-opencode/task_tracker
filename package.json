@@ -7,8 +7,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "bash tests/run.sh && TZ=UTC node --test tests/",
+    "test": "cargo test && bash tests/run.sh && TZ=UTC node --test tests/",
     "test:cli": "bash tests/run.sh",
+    "test:rust": "cargo test",
     "test:plugin": "TZ=UTC node --test tests/plugin.test.js"
   }
 }

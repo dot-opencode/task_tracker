@@ -331,19 +331,7 @@ test_edit_malformed_first_line_is_refused() {
   assert_eq "$(cat "$f")" "$before"
 }
 
-test_edit_rewriters_fail_without_anchor() {
-  load_lib frontmatter
-  local f="$TMP/raw.md" rc=0
-  printf -- '---\nid: T-0001\nsource: x\n\n## Log\n' > "$f"
-  fm_set "$f" pr y || rc=$?
-  assert_eq "$rc" 1
-  rc=0; fm_unset "$f" source || rc=$?
-  assert_eq "$rc" 1
-  rc=0; result_append "$f" text || rc=$?
-  assert_eq "$rc" 1
-  assert_eq "$(cat "$f")" "$(printf -- '---\nid: T-0001\nsource: x\n\n## Log')"
-  assert_eq "$(find "$TMP" -maxdepth 1 -name '*.tmp' | wc -l | tr -d ' ')" 0
-}
+# test_edit_rewriters_fail_without_anchor: Rust unit test frontmatter::tests::rewriters_fail_without_anchor
 
 test_edit_set_project_rejects_traversal() {
   "$TASK" new "Trav" >/dev/null
@@ -411,16 +399,14 @@ test_edit_set_quotes_yaml_typed_scalars() {
   "$TASK" new "Typed" >/dev/null
   local f v
   f="$(task_path_of T-0001)"
-  load_lib frontmatter
+  # fm_get round-trip: Rust unit test frontmatter::tests::typed_scalars_round_trip
   for v in 123 2026-10-01 true null '~' No OFF 1.5 -7 12:30; do
     "$TASK" set 1 source "$v" >/dev/null
     assert_eq "$(grep '^source:' "$f")" "source: \"$v\""
-    assert_eq "$(fm_get "$f" source)" "$v"
   done
   for v in https://x.example/a dev_env nullable 2026-10-01-x; do
     "$TASK" set 1 source "$v" >/dev/null
     assert_eq "$(grep '^source:' "$f")" "source: $v"
-    assert_eq "$(fm_get "$f" source)" "$v"
   done
 }
 

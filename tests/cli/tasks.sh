@@ -46,31 +46,11 @@ test_tasks_title_quoting_round_trip() {
   local f
   f="$(task_path_of T-0001)"
   assert_contains "$(cat "$f")" 'title: "He said \"hi\" \\ back"'
-  load_lib frontmatter
-  assert_eq "$(fm_get "$f" title)" 'He said "hi" \ back'
   assert_eq "$("$TASK" ls --json | jq -r '.[0].title')" 'He said "hi" \ back'
 }
 
-test_tasks_fm_quote_rules() {
-  load_lib frontmatter
-  assert_eq "$(fm_quote plain-value)" "plain-value"
-  assert_eq "$(fm_quote https://a.example/x?y=1)" "https://a.example/x?y=1"
-  assert_eq "$(fm_quote 'a: b')" '"a: b"'
-  assert_eq "$(fm_quote 'a #b')" '"a #b"'
-  assert_eq "$(fm_quote 'ends:')" '"ends:"'
-  assert_eq "$(fm_quote '-dash')" '"-dash"'
-  assert_eq "$(fm_quote 'q"uote')" '"q\"uote"'
-}
-
-test_tasks_slug_rules() {
-  load_lib tasks
-  assert_eq "$(slugify 'Fix internal service URL: port drift (ABC-6719)')" "fix-internal-service-url-port-drift-abc-6719"
-  assert_eq "$(slugify 'Добавить SAN для ianus.localhost')" "san-ianus-localhost"
-  assert_eq "$(slugify 'Исправить дрейф')" ""
-  assert_eq "$(slugify 'aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff')" "aaaaaaaaaa-bbbbbbbbbb-cccccccccc-dddddddddd"
-  assert_eq "$(slugify "$(printf 'x%.0s' $(seq 1 60))")" "$(printf 'x%.0s' $(seq 1 50))"
-  assert_eq "$(slugify '!!!')" ""
-}
+# test_tasks_fm_quote_rules: Rust unit test frontmatter::tests::quote_rules
+# test_tasks_slug_rules: Rust unit test cmd::tasks::tests::slug_rules
 
 test_tasks_new_slug_variants() {
   "$TASK" new "Исправить дрейф" >/dev/null
@@ -344,8 +324,7 @@ test_tasks_ls_json() {
 
 test_tasks_ls_json_session() {
   write_task_file 00_backlog T-0001 "Has session"
-  load_lib frontmatter
-  fm_set "$(task_path_of T-0001)" session ses_abc
+  "$TASK" set 1 session ses_abc >/dev/null
   assert_eq "$("$TASK" ls --json | jq -r '.[0].session')" "ses_abc"
 }
 

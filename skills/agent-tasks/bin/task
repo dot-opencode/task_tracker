@@ -1,109 +1,21 @@
-#!/usr/bin/env bash
-set -euo pipefail
-VERSION="0.2.0"
+#!/bin/sh
+# Entry point shim: resolves its own symlinks and execs the Rust binary built
+# at <repo>/target/release/task (cargo build --release).
+set -eu
 
-usage() {
-  cat <<'EOF'
-usage: task <command> [args]        (task --version prints the version)
-
-tasks:
-  task new <title> [--project P] [--ws W] [--source URL] [--slug S] [--body TEXT|-] [--ready] [--parent ID] [--depends ID,ID]
-  task ls [<folder>|--waiting|--all] [--ws W] [--parent ID] [--json]
-  task show <id>
-  task logs [<id>] [-n N] [-f]
-  task path <id>
-  task mv <id> <folder> [--reason TEXT] [--force]
-  task log <id> <message|-> [--author A]
-  task set <id> <key> <value>      (also parent <id>, depends_on "<ids>")
-  task unset <id> <key>
-  task done <id> --result pr|merged|kept|discarded|cancelled [--summary TEXT|-] [--force]
-  task merged <id> [--summary TEXT|-] [--force]
-  task worktree <id> [--branch B] [--base REF] | --remove [--force]
-  task check-mrs                      (check MR/PR state of unmerged tasks now)
-  task archive <id> | --due
-  task unarchive <id>
-  task postpone <id> [--reason TEXT]
-  task resume <id>
-  task bind <id> --session <session-id>
-  task find --session <session-id>
-
-store:
-  task project add [<name> [<path>]] [--ws W]
-  task project ls [--ws W]
-  task project import-memory [--ws W]
-  task backup
-  task doctor
-
-automation:
-  task signal <id> <signal> --session <session-id> [--text TEXT]
-  task approve <id> [--now]
-  task auto [on [DURATION] | off]
-  task run --once
-  task open <id>
-  task next
-  task install-opencode
-
-<id>: T-0083, t-83 or 83
-folders: 00_backlog 01_ready 02_exploring 03_brainstorming 04_spec_review 05_planning
-         06_plan_review 07_approved 08_implementing 09_finishing 10_unmerged 11_done blocked postponed archive
-         (also by number or status name: 3, 03, plan_review)
-store: $AGENT_TASKS_HOME, default ~/.agent-tasks
-EOF
-}
-
-die() { echo "task: $*" >&2; exit 1; }
-
-# The CLI is usually reached through a symlink (~/.local/bin/task); the libs
-# live next to the real file.
-canonical_path() {
-  local path="$1" dir target
-  while [ -L "$path" ]; do
-    dir="$(cd -P "$(dirname "$path")" && pwd -P)" || return 1
-    target="$(readlink "$path")"
-    case "$target" in /*) path="$target" ;; *) path="$dir/$target" ;; esac
-  done
-  dir="$(cd -P "$(dirname "$path")" && pwd -P)" || return 1
-  printf '%s/%s\n' "$dir" "$(basename "$path")"
-}
-
-TASK_SELF="$(canonical_path "${BASH_SOURCE[0]}")" || die "cannot resolve CLI path"
-TASK_ROOT="$(cd -P "$(dirname "$TASK_SELF")/.." && pwd -P)"
-# shellcheck disable=SC2034 # used by libs that re-invoke the CLI
-TASK_BIN="$TASK_ROOT/bin/task"
-
-for _lib in "$TASK_ROOT"/lib/*.sh; do
-  [ -e "$_lib" ] || continue
-  # shellcheck source=/dev/null # libs are found by glob
-  . "$_lib"
+self="$0"
+while [ -L "$self" ]; do
+  dir="$(cd -P "$(dirname "$self")" && pwd -P)" || exit 1
+  target="$(readlink "$self")"
+  case "$target" in /*) self="$target" ;; *) self="$dir/$target" ;; esac
 done
-
-main() {
-  local cmd="${1:-}" fn
-  if [ $# -gt 0 ]; then shift; fi
-  case "$cmd" in
-    -v|--version) echo "task $VERSION"; return 0 ;;
-    -h|--help|help) usage; return 0 ;;
-    "") usage >&2; return 1 ;;
-  esac
-  [[ "$cmd" =~ ^[a-z][a-z-]*$ ]] || die "unknown command: $cmd (see 'task --help')"
-  fn="cmd_${cmd//-/_}"
-  if ! declare -F "$fn" >/dev/null; then
-    # Agents guess `set-url`, `set-pr`…: point them at the real form.
-    case "$cmd" in
-      set-?*) die "unknown command: $cmd; to set a field use 'task set <id> ${cmd#set-} <value>' (keys: title project source session spec plan pr result parent depends_on)" ;;
-    esac
-    die "unknown command: $cmd (see 'task --help')"
-  fi
-  # `task <cmd> --help` prints that command's usage lines instead of failing on an unknown option.
-  case "${1:-}" in
-    -h|--help)
-      usage | grep -E "^  task $cmd( |\$)" || usage
-      return 0 ;;
-  esac
-  ensure_store
-  "$fn" "$@"
-}
-
-# `exit` on the same line: bash reads a script as it runs, so editing this file
-# during a long command must not make bash execute the bytes that follow.
-main "$@"; exit $?
+dir="$(cd -P "$(dirname "$self")" && pwd -P)" || { echo "task: cannot resolve CLI path" >&2; exit 1; }
+AGENT_TASKS_ROOT="$(cd -P "$dir/.." && pwd -P)"
+repo="$(cd -P "$AGENT_TASKS_ROOT/../.." && pwd -P)"
+bin="$repo/target/release/task"
+if [ ! -x "$bin" ]; then
+  echo "task: binary not found at $bin; run 'cargo build --release' in $repo" >&2
+  exit 1
+fi
+export AGENT_TASKS_ROOT
+exec "$bin" "$@"

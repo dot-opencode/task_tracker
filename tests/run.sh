@@ -5,6 +5,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC2034 # used by the sourced tests/cli/*.sh
 TASK="$ROOT/skills/agent-tasks/bin/task"
 PASS=0; FAIL=0
+
+# The skill's bin/task is a shim around target/release/task: build it once.
+if [ -z "${SKIP_CARGO_BUILD:-}" ]; then
+  (cd "$ROOT" && cargo build --release --quiet) || { echo "cargo build --release failed"; exit 1; }
+fi
 FILTER="${1:-}"
 
 setup() {

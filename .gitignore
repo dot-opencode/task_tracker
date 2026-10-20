@@ -13,3 +13,6 @@ docs/superpowers/
 # dependencies
 node_modules/
 .proto-stage2/
+
+# rust
+target/
