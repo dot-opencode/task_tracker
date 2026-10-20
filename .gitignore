@@ -1,0 +1,15 @@
+# local agent tooling state (per-machine, never shipped)
+.opencode
+.agents
+.memory/
+.superpowers/
+docs/superpowers/
+
+# OS / editor noise
+.DS_Store
+*.swp
+*~
+
+# dependencies
+node_modules/
+.proto-stage2/

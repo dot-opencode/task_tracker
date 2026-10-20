@@ -1,0 +1,14 @@
+{
+  "name": "agent-tasks",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "bash tests/run.sh && TZ=UTC node --test tests/",
+    "test:cli": "bash tests/run.sh",
+    "test:plugin": "TZ=UTC node --test tests/plugin.test.js"
+  }
+}
