@@ -1,7 +1,7 @@
 {
   "name": "agent-tasks",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "exports": {
     ".": "./skills/agent-tasks/opencode/agent-tasks.js",

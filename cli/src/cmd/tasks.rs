@@ -274,6 +274,7 @@ struct Rec {
     project: String,
     created: String,
     session: String,
+    source: String,
     path: String,
     status: String,
     parent: String,
@@ -501,6 +502,7 @@ pub fn cmd_ls(args: &[String]) -> i32 {
             project: row.project,
             created: row.created,
             session: row.session,
+            source: row.source,
             path: row.path,
             parent: st.parent_of(&tid),
             deps: st.deps_of(&tid),
@@ -518,7 +520,7 @@ pub fn cmd_ls(args: &[String]) -> i32 {
                 json!({
                     "id": r.id, "title": r.title, "project": opt(&r.project),
                     "workspace": r.ws, "folder": r.folder, "status": r.status,
-                    "created": r.created, "session": opt(&r.session), "path": r.path,
+                    "created": r.created, "session": opt(&r.session), "source": opt(&r.source), "path": r.path,
                     "parent": opt(&r.parent), "depends_on": r.deps,
                     "blocked_by": r.blocked, "children": r.children,
                 })

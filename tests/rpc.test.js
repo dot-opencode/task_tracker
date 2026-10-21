@@ -116,7 +116,7 @@ test("subtasks: parent/depends/force map to CLI flags", async () => {
   assert.equal((await bad.handlers.set({ id: "1", key: "parent", value: "nope" }, context)).data.field, "value")
   assert.deepEqual(bad.calls, [])
   const props = AgentTasksRpc.methods.list.output.properties.tasks.items.properties
-  for (const k of ["parent", "depends_on", "blocked_by", "children"]) assert.ok(props[k], k)
+  for (const k of ["source", "parent", "depends_on", "blocked_by", "children"]) assert.ok(props[k], k)
 })
 
 test("approve reports start or deferred", async () => {

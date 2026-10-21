@@ -41,6 +41,7 @@ const TASK = object({
   status: { type: "string" },
   created: { type: "string" },
   session: NULLABLE,
+  source: NULLABLE,
   path: { type: "string" },
   parent: NULLABLE,
   depends_on: { type: "array", items: { type: "string" } },

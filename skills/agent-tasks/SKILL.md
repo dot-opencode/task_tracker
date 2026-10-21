@@ -90,7 +90,7 @@ change the links; self links, cycles and a parent in another workspace are refus
 - The worker does not start a `01_ready`/`07_approved` task while one of its `depends_on` tasks is not
   in `10_unmerged`/`11_done`/`archive` (`task ls` shows `(waits T-0084)`). Manual moves and
   `task approve --now` are not gated.
-- `task ls --parent T-0083` lists the subtasks; `task ls --json` has `parent`, `depends_on`,
+- `task ls --parent T-0083` lists the subtasks; `task ls --json` has `source`, `parent`, `depends_on`,
   `blocked_by`, `children`; `task show` appends the subtask list.
 
 ## Logging

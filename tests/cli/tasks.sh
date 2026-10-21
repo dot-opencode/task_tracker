@@ -23,6 +23,7 @@ test_tasks_new_exact_content() {
   esac
   assert_eq "$(wc -l < "$f" | tr -d ' ')" 12
   assert_eq "$(last_subject)" "tasks(work): T-0001 new"
+  assert_eq "$("$TASK" ls --json | jq -r '.[0].source')" "https://y.example/issue/1"
 }
 
 test_tasks_new_without_body_layout() {

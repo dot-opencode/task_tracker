@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 — 2026-10-21
+
+- `task ls --json` and the plugin `list` RPC include `source` (the ticket url).
+
 ## 0.3.1 — 2026-10-21
 
 - Plugin RPC event `changed` now also fires (`action: "store"`) for changes made by other CLI runs (worker, `check-mrs`, terminal), by polling the store's git log.

@@ -329,7 +329,7 @@ pub fn result_append(file: &str, text: &str) -> Result<(), ()> {
     commit_tmp(&tmp_for(file), file, &out)
 }
 
-/// One row per file: path, id, title, project, created, session.
+/// One row per file: path, id, title, project, created, session, source.
 #[derive(Debug, Clone, Default)]
 pub struct Row {
     pub path: String,
@@ -338,6 +338,7 @@ pub struct Row {
     pub project: String,
     pub created: String,
     pub session: String,
+    pub source: String,
 }
 
 pub fn task_rows(files: &[String]) -> Vec<Row> {
@@ -371,6 +372,7 @@ pub fn task_rows(files: &[String]) -> Vec<Row> {
                         "project" => row.project = v,
                         "created" => row.created = v,
                         "session" => row.session = v,
+                        "source" => row.source = v,
                         _ => {}
                     }
                 }
