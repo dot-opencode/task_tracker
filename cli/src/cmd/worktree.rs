@@ -58,7 +58,11 @@ fn fetch_remotes(repo: &str) -> Option<String> {
         Ok(o) if o.status.success() => None,
         Ok(o) => {
             let err = String::from_utf8_lossy(&o.stderr);
-            let first = err.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+            let first = err
+                .lines()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("")
+                .trim();
             Some(format!("git fetch failed ({first}); the base may be stale"))
         }
         Err(e) => Some(format!("git fetch failed ({e}); the base may be stale")),
@@ -76,27 +80,47 @@ fn fresh_base(repo: &str, base: &str) -> (String, Option<String>) {
     };
     let keep = (base.to_string(), None);
     if name.is_empty()
-        || git_in(repo, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{name}")]).is_none()
+        || git_in(
+            repo,
+            &[
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/heads/{name}"),
+            ],
+        )
+        .is_none()
     {
         return keep;
     }
     let Some(up) = git_in(
         repo,
-        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", &format!("{name}@{{upstream}}")],
+        &[
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            &format!("{name}@{{upstream}}"),
+        ],
     )
     .filter(|s| !s.is_empty()) else {
         return keep;
     };
-    let ancestor = |a: &str, b: &str| git_in(repo, &["merge-base", "--is-ancestor", a, b]).is_some();
+    let ancestor =
+        |a: &str, b: &str| git_in(repo, &["merge-base", "--is-ancestor", a, b]).is_some();
     if ancestor(&up, &name) {
         return keep; // up to date or only ahead
     }
     if ancestor(&name, &up) {
-        return (up.clone(), Some(format!("base {name} is behind {up}; branched from {up}")));
+        return (
+            up.clone(),
+            Some(format!("base {name} is behind {up}; branched from {up}")),
+        );
     }
     (
         base.to_string(),
-        Some(format!("base {name} has diverged from {up}; branched from local {name}, check it is current")),
+        Some(format!(
+            "base {name} has diverged from {up}; branched from local {name}, check it is current"
+        )),
     )
 }
 
