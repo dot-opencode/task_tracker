@@ -382,6 +382,19 @@ test("context re-reads the folder on every hook", async (t) => {
   assert.match(b.system[0].text, /Implement the approved plan in a worktree/)
 })
 
+test("tasks with a source must re-read the ticket comments and check a fresh base when work starts", () => {
+  const src = "https://yt.example/issue/X-1"
+  for (const folder of ["02_exploring", "03_brainstorming", "08_implementing"]) {
+    const text = contextText({ id: "T-1", title: "t", folder, source: src })
+    assert.match(text, /re-read the ticket https:\/\/yt\.example\/issue\/X-1 including all comments/, folder)
+    assert.match(text, /git fetch, then origin\/<base>.*already done.*stop.*ask the user/s, folder)
+  }
+  for (const folder of ["05_planning", "09_finishing", "00_backlog"]) {
+    assert.doesNotMatch(contextText({ id: "T-1", title: "t", folder, source: src }), /re-read the ticket/, folder)
+  }
+  assert.doesNotMatch(contextText({ id: "T-1", title: "t", folder: "08_implementing" }), /re-read the ticket/)
+})
+
 test("contextText truncates to the limit and keeps the closing tag", () => {
   const text = contextText({ id: "T-0001", title: "t", folder: "08_implementing", project: "p", body: "x".repeat(10_000) })
   assert.ok(text.length <= LIMIT, `length ${text.length}`)

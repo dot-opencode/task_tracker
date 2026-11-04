@@ -57,6 +57,7 @@ keeps the format and commits the store.
 | bind this OpenCode session to a task | `task bind T-0083 --session <your session id>` |
 
 Worktrees: `task worktree <id>` creates `<repo>/.worktrees/<T-id>` (the task needs a project) and prints its path.
+Before creating a new branch it runs `git fetch`; if the base (default: the current branch) is a local branch behind its upstream, it branches from the upstream and logs it. A failed fetch is logged as a warning.
 Work only there and do not create worktrees elsewhere ($TMPDIR, sibling directories of the repo, `.claude/worktrees`, `.slim/worktrees`).
 `task worktree` adds `.worktrees/` to `.git/info/exclude` itself; never add it to the tracked `.gitignore`.
 The worktree is removed when the task reaches 11_done;
@@ -128,6 +129,9 @@ folders from the session's signals: a question, the end of a turn, a permission 
 **Don't move the task yourself** while the plugin is active; its rules for the current folder are
 injected into your context.
 
+- If the task has a `source` (ticket), at the start of exploring, brainstorming and implementing re-read
+  the ticket with all its comments and check the fetched base branch for an existing implementation.
+  If the work is already done or decided differently, log it and ask the user before going on.
 - Ask the user questions only with the question tool: one at a time, with options and your
   recommendation.
 - When the user approves the spec, run `task approve T-0083`; it prints `start` and the task moves to

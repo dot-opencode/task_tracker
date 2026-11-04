@@ -40,6 +40,44 @@ test_worktree_existing_branch_and_custom() {
   assert_eq "$(git -C "$REPO/.worktrees/T-0002" symbolic-ref --short HEAD)" "feat/x"
 }
 
+wt_setup_remote() {   # repo cloned from $TMP/code/origin; origin gets one commit more after the clone
+  mkdir -p "$TMP/code"
+  git init -q --bare "$TMP/code/origin.git"
+  git clone -q "$TMP/code/origin.git" "$TMP/code/seed" 2>/dev/null
+  git -C "$TMP/code/seed" commit -q --allow-empty -m init
+  git -C "$TMP/code/seed" push -q origin HEAD:main
+  git clone -q "$TMP/code/origin.git" "$TMP/code/repo"
+  git -C "$TMP/code/seed" commit -q --allow-empty -m newer
+  git -C "$TMP/code/seed" push -q origin HEAD:main
+  "$TASK" project add repo "$TMP/code/repo" >/dev/null
+  "$TASK" new "Fix thing" --project repo >/dev/null
+  REPO="$TMP/code/repo"
+  WT="$REPO/.worktrees/T-0001"
+}
+
+test_worktree_fetches_and_uses_upstream_when_behind() {
+  wt_setup_remote
+  "$TASK" worktree 1 --base main >/dev/null 2>&1
+  assert_eq "$(git -C "$WT" log -1 --format=%s)" "newer"
+  assert_contains "$(cat "$(task_path_of T-0001)")" "base main is behind origin/main; branched from origin/main"
+}
+
+test_worktree_default_base_behind_upstream() {
+  wt_setup_remote
+  "$TASK" worktree 1 >/dev/null 2>&1
+  assert_eq "$(git -C "$WT" log -1 --format=%s)" "newer"
+}
+
+test_worktree_fetch_failure_warns() {
+  wt_setup_remote
+  rm -rf "$TMP/code/origin.git"
+  local rc=0
+  "$TASK" worktree 1 --base main >/dev/null 2>&1 || rc=$?
+  assert_eq "$rc" "0"
+  [ -d "$WT" ] || fail "no worktree dir"
+  assert_contains "$(cat "$(task_path_of T-0001)")" "git fetch failed"
+}
+
 test_worktree_no_project() {
   "$TASK" new "Loose" >/dev/null
   local out rc=0

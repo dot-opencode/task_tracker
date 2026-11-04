@@ -42,6 +42,64 @@ fn git_in(dir: &str, args: &[&str]) -> Option<String> {
     )
 }
 
+/// Fetches the repo's remotes so a new branch does not start from a stale base.
+/// Never fails: returns a warning for the task log, or None when all is well.
+fn fetch_remotes(repo: &str) -> Option<String> {
+    if git_in(repo, &["remote"]).unwrap_or_default().is_empty() {
+        return None;
+    }
+    let out = Command::new("git")
+        .args(["-C", repo, "fetch", "--all", "--quiet"])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output();
+    match out {
+        Ok(o) if o.status.success() => None,
+        Ok(o) => {
+            let err = String::from_utf8_lossy(&o.stderr);
+            let first = err.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+            Some(format!("git fetch failed ({first}); the base may be stale"))
+        }
+        Err(e) => Some(format!("git fetch failed ({e}); the base may be stale")),
+    }
+}
+
+/// Start point for a new branch. When `base` (default: the current branch) is a
+/// local branch that is behind its upstream, the upstream is used instead.
+/// Returns the start point and a note for the task log.
+fn fresh_base(repo: &str, base: &str) -> (String, Option<String>) {
+    let name = if base.is_empty() || base == "HEAD" {
+        git_in(repo, &["symbolic-ref", "--short", "-q", "HEAD"]).unwrap_or_default()
+    } else {
+        base.to_string()
+    };
+    let keep = (base.to_string(), None);
+    if name.is_empty()
+        || git_in(repo, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{name}")]).is_none()
+    {
+        return keep;
+    }
+    let Some(up) = git_in(
+        repo,
+        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", &format!("{name}@{{upstream}}")],
+    )
+    .filter(|s| !s.is_empty()) else {
+        return keep;
+    };
+    let ancestor = |a: &str, b: &str| git_in(repo, &["merge-base", "--is-ancestor", a, b]).is_some();
+    if ancestor(&up, &name) {
+        return keep; // up to date or only ahead
+    }
+    if ancestor(&name, &up) {
+        return (up.clone(), Some(format!("base {name} is behind {up}; branched from {up}")));
+    }
+    (
+        base.to_string(),
+        Some(format!("base {name} has diverged from {up}; branched from local {name}, check it is current")),
+    )
+}
+
 /// Registered worktree: the directory exists and git recognises it.
 fn worktree_alive(path: &str) -> bool {
     Path::new(&format!("{path}/.git")).exists()
@@ -217,6 +275,7 @@ pub fn cmd_worktree(args: &[String]) -> i32 {
     }
 
     let wt = format!("{repo}/.worktrees/{tid}");
+    let mut notes: Vec<String> = Vec::new();
     if Path::new(&wt).exists() && !worktree_alive(&wt) {
         die(format!("{wt} exists but is not a git worktree"));
     }
@@ -265,6 +324,14 @@ pub fn cmd_worktree(args: &[String]) -> i32 {
             ],
         )
         .is_some();
+        if !exists {
+            if let Some(w) = fetch_remotes(&repo) {
+                notes.push(w);
+            }
+            let (b, note) = fresh_base(&repo, &base);
+            base = b;
+            notes.extend(note);
+        }
         let mut a: Vec<&str> = vec!["-C", &repo, "worktree", "add", "-q"];
         if exists {
             a.push(&wt);
@@ -294,6 +361,10 @@ pub fn cmd_worktree(args: &[String]) -> i32 {
         die(format!("cannot update {f}"));
     }
     log_append(&f, "task", &format!("worktree {wt} (branch {branch})"));
+    for n in &notes {
+        eprintln!("task: {n}");
+        log_append(&f, "task", n);
+    }
     store_commit();
     println!("{wt}");
     0

@@ -138,6 +138,14 @@ export const RULES = {
     "This task is postponed by the user. Do not work on it unless the user asks; " +
     `to bring it back run \`task resume ${id}\`.`,
 }
+// Folders where work starts on a ticket: the ticket and the code may have moved on since the task was written.
+const FRESHNESS_FOLDERS = new Set(["02_exploring", "03_brainstorming", "08_implementing"])
+const FRESHNESS_RULE = (id, source) =>
+  `Before any work, re-read the ticket ${source} including all comments (the task body is a snapshot and ` +
+  "omits comments; decisions and \"already done\" notes live there), and check the up-to-date base branch " +
+  "(git fetch, then origin/<base>, not the local branch) for an existing implementation. If the ticket or " +
+  `the code shows the work is already done or decided differently, stop, \`task log ${id}\` the finding and ` +
+  "ask the user before continuing."
 const COMMON_RULE = (id) => `Never edit task files directly; record notes and decisions with \`task log ${id} "…"\`.`
 
 // ---------------------------------------------------------------- pure helpers
@@ -203,13 +211,14 @@ export function folderOfPath(path) {
   return basename(dirname(String(path).trim()))
 }
 
-export function contextText({ id, title, folder, project, spec, plan, body, blocked_from: blockedFrom }) {
+export function contextText({ id, title, folder, project, spec, plan, source, body, blocked_from: blockedFrom }) {
   const head = [`Task ${id}: "${title ?? ""}" — folder ${folder}${project ? `, project ${project}` : ""}` +
     (folder === "blocked" && blockedFrom ? ` (blocked from ${blockedFrom})` : "")]
   if (spec) head.push(`spec: ${spec}`)
   if (plan) head.push(`plan: ${plan}`)
   const rule = RULES[folder]
-  const rules = [rule ? rule(id) : null, COMMON_RULE(id)].filter(Boolean).map((r) => `- ${r}`).join("\n")
+  const fresh = source && FRESHNESS_FOLDERS.has(folder) ? FRESHNESS_RULE(id, source) : null
+  const rules = [fresh, rule ? rule(id) : null, COMMON_RULE(id)].filter(Boolean).map((r) => `- ${r}`).join("\n")
   const top = `${OPEN}\n${head.join("\n")}\n\nRules:\n${rules}\n`
   const text = body ? `${top}\nDescription:\n${body}\n${CLOSE}` : `${top}${CLOSE}`
   if (text.length <= LIMIT) return text
