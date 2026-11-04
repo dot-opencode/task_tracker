@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 — 2026-11-05
 
 - `task worktree` runs `git fetch` before creating a branch; when the base (default: the current branch) is a local branch behind its upstream, it branches from the upstream and logs it. A failed fetch is logged, not fatal.
 - Plugin rules for 02_exploring, 03_brainstorming and 08_implementing: when the task has a `source`, re-read the ticket with its comments and check the fresh base branch for an existing implementation; stop and ask if the work is already done.
