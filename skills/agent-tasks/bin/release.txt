@@ -1,7 +1,7 @@
 # Format: "version <semver>" then one "sha256 <target> <hex>" line per target (sha256 of task-<target>.tar.gz).
 # Rewritten by .github/workflows/release.yml on each release tag.
-version 0.3.3
-sha256 aarch64-apple-darwin 7235fdd98a9175d4553717900bc94d3b7f2c9715ed251bff33018a1cd4fec2f2
-sha256 x86_64-apple-darwin 6c054020358392f908c20dec4fd87095d00b6f4a1ec12b6fdb7997126bd68f6d
-sha256 x86_64-unknown-linux-musl 0f1bcb954c9c6866128dddc466057ec8dcaa0afbfaa25402e8b625433f45099d
-sha256 aarch64-unknown-linux-musl 5d28bc56d6bf43d490c6e5851133a7daa99c32586136a488b25b1424827122d7
+version 0.3.4
+sha256 aarch64-apple-darwin b18e386357b5030b58a604312b936deea2eea0f9cc69c5b6a86752f5bcac3e64
+sha256 x86_64-apple-darwin 8640d809f6b4f5831a4f891360be3791ef069823e3e26a342b196e9462406a0d
+sha256 x86_64-unknown-linux-musl 3d6479922c3b8ecce177e3693a4500555e70bcf73130bdaab56b3895830b7d91
+sha256 aarch64-unknown-linux-musl d96fae85319e514080301b3856fbd1f96f301c2fa7c5ed0a61d4d1a49f45d4eb
