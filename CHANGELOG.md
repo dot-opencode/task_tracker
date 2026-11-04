@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 — 2026-11-04
+
+- Planning rule (05_planning) presets subagent-driven-development as the execution method, so writing-plans no longer asks which execution approach to use.
+
 ## 0.3.2 — 2026-10-21
 
 - `task ls --json` and the plugin `list` RPC include `source` (the ticket url).
