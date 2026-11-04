@@ -103,7 +103,8 @@ export const RULES = {
   "04_spec_review": BRAINSTORM,
   "05_planning": (id) =>
     "The spec is approved. Write the implementation plan with writing-plans and save it to " +
-    "docs/superpowers/plans/ (writing it there records it on the task). Then ask the user to review the plan " +
+    "docs/superpowers/plans/ (writing it there records it on the task). The execution method is already " +
+    "supplied: subagent-driven-development; do not ask which execution approach to use. Then ask the user to review the plan " +
     "(the question tool is fine) and end the turn. Do not implement. When the user approves the plan, " +
     `run \`task approve ${id}\` at once (see 06_plan_review).`,
   "06_plan_review": (id) =>
