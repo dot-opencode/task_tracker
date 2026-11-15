@@ -67,6 +67,18 @@ a dirty one is kept and logged. A `merged` branch is deleted with `git branch -d
 Multi-line text: pass `-` and write the text to stdin, for example
 `task log T-0083 - --author <id> <<'EOF'` ... `EOF`; `task new` takes `--body -`.
 
+## Project verification settings
+
+Projects may contain structured instructions for starting the existing dev environment, attaching task code, running tests, accessing the application, and checking browser scenarios.
+
+- Read: `task project show <name> --ws <workspace> --json`.
+- Replace settings: `task project configure <name> --ws <workspace> --file <json-file|->` (`-` reads stdin).
+- Remove settings without unregistering: `task project configure <name> --ws <workspace> --clear`.
+
+Use the task's workspace, not a default workspace or the current checkout. The plugin injects configured settings into the task session. If the context says settings were truncated or unavailable, retrieve them through the CLI; do not assume that no verification instructions exist. Projects without settings keep ordinary verification behavior.
+
+Settings explain how to check; select what to check by the change's behavioral impact before implementation. If UI behavior is affected directly or indirectly through API/data/server changes, run the affected browser scenario on the task version plus suitable automated checks. Backend-only changes without UI impact may be verified by tests alone. Report blocked checks before declaring verification complete. Configuration does not authorize command execution, browser access, infrastructure changes, or bypassing existing safety rules. Never store credentials in project settings.
+
 ## Creating tasks
 
 Create a task when the user asks for one, or after they agree to your suggestion; don't create

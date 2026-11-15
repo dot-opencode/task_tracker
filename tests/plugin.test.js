@@ -85,6 +85,7 @@ function contextFor({ sessions, events, folder = "03_brainstorming", taskText = 
     runTask: runTask ?? (async (args) => {
       calls.push(args)
       if (args[0] === "path") return { code: 0, stdout: `${STORE}/${state.folder}/T-0083-fix.md\n`, stderr: "" }
+      if (args[0] === "project") return { code: 0, stdout: JSON.stringify({ workspace: "work", name: "crm", path: DIR, settings: null }), stderr: "" }
       if (args[0] === "bind") return { code: 0, stdout: `T-0083: bound to ${args[3]}\n`, stderr: "" }
       return { code: 0, stdout: "", stderr: "" }
     }),
@@ -349,6 +350,110 @@ test("gh pr create output → task set pr <url>", async (t) => {
 })
 
 // ---------------------------------------------------------------- context
+
+async function projectContext(t, { settings = null, response, taskText = TASK_TEXT, workspace = "work" } = {}) {
+  const e = await setup(t, { taskText, folder: "08_implementing" })
+  const original = e.deps.runTask
+  e.deps.runTask = async (args) => {
+    if (args[0] !== "project") return original(args)
+    e.calls.push(args)
+    return response ? response() : { code: 0, stdout: JSON.stringify({ workspace, name: "crm", path: DIR, settings }), stderr: "" }
+  }
+  e.render = async (hook = "context") => {
+    const ev = { sessionID: "ses_root", system: [] }
+    await e.hook(hook)(ev)
+    return ev.system[0]?.text
+  }
+  return e
+}
+
+test("project context: legacy null preserves exact context; no project avoids lookup", async (t) => {
+  const e = await projectContext(t)
+  const text = await e.render()
+  const parsed = parseTask(TASK_TEXT)
+  assert.equal(text, contextText({ ...parsed.fields, folder: "08_implementing", body: parsed.body }))
+  assert.deepEqual(e.calls.filter((c) => c[0] === "project"), [["project", "show", "crm", "--ws", "work", "--json"]])
+  const noProject = await projectContext(t, { taskText: TASK_TEXT.replace("project: crm\n", "") })
+  assert.doesNotMatch(await noProject.render(), /Project verification|UI impact/)
+  assert.equal(noProject.calls.filter((c) => c[0] === "project").length, 0)
+})
+
+test("project context: renders labeled settings and impact-based safety guidance without executing commands", async (t) => {
+  const settings = { version: 1, environment: { cwd: "/app", start: "START_SENTINEL", stop: "STOP_SENTINEL", readiness: "READY_SENTINEL" },
+    task_code: { attach: "ATTACH_SENTINEL", verify_version: "VERSION_SENTINEL" },
+    tests: [{ name: "backend", cwd: "/tests", command: "TEST_SENTINEL" }],
+    application: { url: "http://example.test", login: "LOGIN_SENTINEL", test_data: "DATA_SENTINEL" },
+    browser: { navigation: "NAV_SENTINEL", checks: "CHECK_SENTINEL" } }
+  const e = await projectContext(t, { settings })
+  const text = await e.render()
+  assert.match(text, /Description:\nThe internal service URL drifts\./)
+  assert.match(text, /Project verification instructions/)
+  for (const value of ["environment", "task_code", "tests", "application", "browser", "START_SENTINEL", "STOP_SENTINEL", "READY_SENTINEL", "ATTACH_SENTINEL", "VERSION_SENTINEL", "backend", "/tests", "TEST_SENTINEL", "http:\/\/example.test", "LOGIN_SENTINEL", "DATA_SENTINEL", "NAV_SENTINEL", "CHECK_SENTINEL"]) assert.ok(text.includes(value), value)
+  assert.match(text, /before implementation/)
+  assert.match(text, /direct and indirect UI impact.*API/s)
+  assert.match(text, /browser scenarios on task code.*automated/s)
+  assert.match(text, /backend-only.*without UI impact.*tests alone/s)
+  assert.match(text, /permissions.*safety/s)
+  assert.match(text, /blockers before declaring verification complete/)
+  assert.deepEqual(e.calls.map((c) => c[0]), ["path", "project"])
+})
+
+test("project context: refreshes settings on context and compaction, scoped to actual task workspace", async (t) => {
+  let command = "first"
+  const e = await projectContext(t, { response: () => ({ code: 0, stdout: JSON.stringify({ workspace: "work", name: "crm", path: DIR, settings: { version: 1, tests: [{ name: "unit", cwd: DIR, command }] } }) }) })
+  assert.match(await e.render(), /first/)
+  command = "second"
+  assert.match(await e.render(), /second/)
+  command = "third"
+  assert.match(await e.render("compaction"), /third/)
+  assert.equal(e.calls.filter((c) => c[0] === "project").length, 3)
+  e.deps.readFile = async () => TASK_TEXT
+  const original = e.deps.runTask
+  e.deps.runTask = async (args) => args[0] === "path" ? { code: 0, stdout: "/store/other/08_implementing/task.md" } : original(args)
+  const text = await e.render()
+  assert.deepEqual(e.calls.at(-1), ["project", "show", "crm", "--ws", "other", "--json"])
+  assert.match(text, /project verification settings unavailable/i)
+  assert.doesNotMatch(text, /third/)
+  e.deps.runTask = async (args) => args[0] === "project"
+    ? { code: 0, stdout: JSON.stringify({ workspace: "other", name: "crm", path: "/other", settings: { version: 1, environment: { start: "OTHER_WORKSPACE" } } }) }
+    : { code: 0, stdout: "/store/other/08_implementing/task.md" }
+  assert.match(await e.render(), /OTHER_WORKSPACE/)
+})
+
+test("project context: failed or malformed lookup warns rather than claiming absence", async (t) => {
+  for (const result of [
+    { code: 1, stdout: "", stderr: "secret diagnostic" }, { code: 0, stdout: "not json" },
+    { code: 0, stdout: JSON.stringify({ workspace: "work", name: "different", path: DIR, settings: null }) },
+    ...[{ environment: {} }, { version: 2 }, { version: 1, tests: "bad" }, { version: 1, surprise: "bad" }, { version: 1, tests: [{ name: "x" }] }, { version: 1, tests: [{ name: "x", command: "test" }] }].map((settings) => ({ code: 0, stdout: JSON.stringify({ workspace: "work", name: "crm", path: DIR, settings }) })),
+  ]) {
+    const e = await projectContext(t, { response: () => result })
+    const text = await e.render()
+    assert.match(text, /project verification settings unavailable/i)
+    assert.doesNotMatch(text, /no configuration|secret diagnostic|direct and indirect UI impact/i)
+    assert.match(text, /Implement the approved plan/)
+  }
+})
+
+test("project context: empty partial settings add no applicability guidance", async (t) => {
+  for (const settings of [{}, { version: 1 }, { version: 1, environment: { start: "   " }, tests: [] }]) {
+    const e = await projectContext(t, { settings })
+    assert.doesNotMatch(await e.render(), /Project verification|direct and indirect UI impact|settings unavailable/)
+  }
+})
+
+test("project context: long settings and description keep budget, stage rules, applicability and explicit retrieval", async (t) => {
+  const e = await projectContext(t, { settings: { version: 1, browser: { checks: "long".repeat(4000) } }, taskText: TASK_TEXT.replace("The internal service URL drifts.", "body".repeat(4000)) })
+  const text = await e.render()
+  assert.ok(text.length <= LIMIT, `length ${text.length}`)
+  assert.equal(LIMIT, 4000)
+  assert.match(text, /Implement the approved plan.*task worktree T-0083/s)
+  assert.match(text, /Never edit task files directly/)
+  assert.match(text, /direct and indirect UI impact/)
+  assert.match(text, /backend-only.*tests alone/s)
+  assert.match(text, /settings truncated; run `task project show crm --ws work --json`/)
+  assert.match(text, /description truncated; run `task show T-0083`/)
+  assert.match(text, /<\/agent-tasks>$/)
+})
 
 test("context and compaction hooks inject one <agent-tasks> block with id, folder, rules and body", async (t) => {
   const e = await setup(t, { folder: "04_spec_review" })

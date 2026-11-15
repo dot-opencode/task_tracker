@@ -40,6 +40,8 @@ tasks:
 store:
   task project add [<name> [<path>]] [--ws W]
   task project ls [--ws W]
+  task project show <name> [--ws W] --json
+  task project configure <name> [--ws W] (--file <path|-> | --clear)
   task project import-memory [--ws W]
   task backup
   task doctor

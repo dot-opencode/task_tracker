@@ -2,9 +2,97 @@
 //! command itself lives in cmd/projects.rs.
 
 use crate::core::{basename, die, list_workspaces, read_file, store, valid_project};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
+
+/// Validate a settings document without interpreting or executing its instructions.
+pub fn parse_project_settings(text: &str) -> Result<Value, String> {
+    let value: Value =
+        serde_json::from_str(text).map_err(|e| format!("invalid project settings JSON: {e}"))?;
+    let object = value
+        .as_object()
+        .ok_or("project settings must be an object")?;
+    if !object.is_empty() && object.get("version").and_then(Value::as_u64) != Some(1) {
+        return Err("project settings require integer version 1".into());
+    }
+    for (key, section) in object {
+        let fields: &[&str] = match key.as_str() {
+            "version" => continue,
+            "environment" => &["cwd", "start", "stop", "readiness"],
+            "task_code" => &["attach", "verify_version"],
+            "application" => &["url", "login", "test_data"],
+            "browser" => &["navigation", "checks"],
+            "tests" => {
+                let tests = section
+                    .as_array()
+                    .ok_or("project settings tests must be an array")?;
+                for test in tests {
+                    validate_text_fields(test, &["name", "cwd", "command"], "tests record")?;
+                    for required in ["name", "cwd", "command"] {
+                        if test.get(required).is_none() {
+                            return Err(format!(
+                                "project settings tests record requires {required}"
+                            ));
+                        }
+                    }
+                }
+                continue;
+            }
+            _ => return Err(format!("unknown project settings field '{key}'")),
+        };
+        validate_text_fields(section, fields, key)?;
+    }
+    Ok(value)
+}
+
+fn validate_text_fields(value: &Value, fields: &[&str], section: &str) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("project settings {section} must be an object"))?;
+    for (key, value) in object {
+        if !fields.contains(&key.as_str()) {
+            return Err(format!("unknown project settings {section} field '{key}'"));
+        }
+        if !value.is_string() {
+            return Err(format!("project settings {section}.{key} must be a string"));
+        }
+    }
+    Ok(())
+}
+
+/// Read the path and optional validated settings together from one registry snapshot.
+pub fn read_project(ws: &str, name: &str) -> Result<(String, Option<Value>), String> {
+    let file = format!("{}/{}/.projects/{}", store(), ws, name);
+    let text = fs::read_to_string(&file).map_err(|e| format!("cannot read {file}: {e}"))?;
+    let (path, payload) = text.split_once('\n').unwrap_or((&text, ""));
+    let settings = if payload.trim().is_empty() {
+        None
+    } else {
+        Some(parse_project_settings(payload)?)
+    };
+    Ok((path.to_string(), settings))
+}
+
+/// Replace settings while retaining the registered path. Caller holds the store lock.
+pub fn write_project_settings(
+    ws: &str,
+    name: &str,
+    settings: Option<&Value>,
+) -> Result<(), String> {
+    let file = format!("{}/{}/.projects/{}", store(), ws, name);
+    let text = fs::read_to_string(&file).map_err(|e| format!("cannot read {file}: {e}"))?;
+    let path = text.split('\n').next().unwrap_or("");
+    let payload = match settings {
+        Some(value) => {
+            let value = parse_project_settings(&value.to_string())?;
+            format!("{}\n", serde_json::to_string_pretty(&value).unwrap())
+        }
+        None => String::new(),
+    };
+    fs::write(&file, format!("{path}\n{payload}")).map_err(|e| format!("cannot write {file}: {e}"))
+}
 
 /// Repository path registered for <ws>/<name>; empty when unknown.
 pub fn project_path(ws: &str, name: &str) -> String {

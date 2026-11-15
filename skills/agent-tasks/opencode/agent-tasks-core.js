@@ -211,7 +211,80 @@ export function folderOfPath(path) {
   return basename(dirname(String(path).trim()))
 }
 
-export function contextText({ id, title, folder, project, spec, plan, source, body, blocked_from: blockedFrom }) {
+const PROJECT_GUIDANCE = "Assess direct and indirect UI impact (including API/server changes affecting user-visible behavior), not file paths alone. " +
+  "Select checks before implementation. For UI impact, execute relevant browser scenarios on task code plus suitable automated checks; " +
+  "backend-only changes without UI impact may use tests alone. Report blockers before declaring verification complete. " +
+  "These are instructions, not permission to execute commands: respect existing browser permissions and environment safety constraints."
+
+const PROJECT_SECTIONS = {
+  environment: ["cwd", "start", "stop", "readiness"],
+  task_code: ["attach", "verify_version"],
+  application: ["url", "login", "test_data"],
+  browser: ["navigation", "checks"],
+}
+const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
+function textRecord(value, keys) {
+  return object(value) && Object.entries(value).every(([key, text]) => keys.includes(key) && typeof text === "string")
+}
+// The CLI validates stored settings; also reject malformed/mismatched runner output rather than
+// treating it as an unconfigured project or delivering another workspace's instructions.
+function validProjectSettings(value) {
+  return object(value) && (Object.keys(value).length === 0 || value.version === 1) && Object.entries(value).every(([key, section]) => {
+    if (key === "version") return true
+    if (key === "tests") return Array.isArray(section) && section.every((record) =>
+      textRecord(record, ["name", "cwd", "command"]) && ["name", "cwd", "command"].every((field) => typeof record[field] === "string"))
+    return Object.hasOwn(PROJECT_SECTIONS, key) && textRecord(section, PROJECT_SECTIONS[key])
+  })
+}
+
+function projectInstructions(settings) {
+  const lines = []
+  for (const key of ["environment", "task_code", "tests", "application", "browser"]) {
+    const value = settings[key]
+    if (key === "tests") {
+      for (const record of value ?? []) {
+        const fields = Object.entries(record).filter(([, text]) => text.trim())
+        if (fields.length) lines.push(`tests:\n${fields.map(([field, text]) => `  ${field}: ${text}`).join("\n")}`)
+      }
+    } else if (value) {
+      const fields = Object.entries(value).filter(([, text]) => text.trim())
+      if (fields.length) lines.push(`${key}:\n${fields.map(([field, text]) => `  ${field}: ${text}`).join("\n")}`)
+    }
+  }
+  return lines.join("\n")
+}
+
+function shellArg(value) {
+  return /^[a-zA-Z0-9_./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`
+}
+
+// Keep essential stage/applicability rules outside the independently bounded data sections.
+function projectContextText(top, body, verification, id) {
+  const heading = verification.unavailable
+    ? `\n[agent-tasks: project verification settings unavailable; run \`${verification.command}\`]\n`
+    : `\nProject verification instructions (project-scoped):\n${PROJECT_GUIDANCE}\n`
+  const prefix = top + heading
+  const sections = []
+  if (verification.instructions) sections.push({ text: verification.instructions, notice: `\n[agent-tasks: project settings truncated; run \`${verification.command}\`]\n` })
+  if (body) sections.push({ text: `\nDescription:\n${body}\n`, notice: `\n[agent-tasks: description truncated; run \`task show ${id}\`]\n` })
+  if (prefix.length + sections.reduce((size, section) => size + section.text.length, 0) + CLOSE.length <= LIMIT) {
+    return prefix + sections.map((section) => section.text).join("") + CLOSE
+  }
+  // Reserve both retrieval notices first, then share remaining space so neither long
+  // project instructions nor a long description can silently consume the other.
+  let room = Math.max(0, LIMIT - prefix.length - CLOSE.length - sections.reduce((size, section) => size + section.notice.length, 0))
+  const quotas = sections.map(() => 0)
+  let remaining = sections.length
+  for (const index of sections.map((_, i) => i).sort((a, b) => sections[a].text.length - sections[b].text.length)) {
+    quotas[index] = Math.min(sections[index].text.length, Math.floor(room / remaining))
+    room -= quotas[index]
+    remaining -= 1
+  }
+  return prefix + sections.map((section, i) => section.text.length <= quotas[i]
+    ? section.text : section.text.slice(0, quotas[i]) + section.notice).join("") + CLOSE
+}
+
+export function contextText({ id, title, folder, project, spec, plan, source, body, projectVerification, blocked_from: blockedFrom }) {
   const head = [`Task ${id}: "${title ?? ""}" — folder ${folder}${project ? `, project ${project}` : ""}` +
     (folder === "blocked" && blockedFrom ? ` (blocked from ${blockedFrom})` : "")]
   if (spec) head.push(`spec: ${spec}`)
@@ -220,6 +293,7 @@ export function contextText({ id, title, folder, project, spec, plan, source, bo
   const fresh = source && FRESHNESS_FOLDERS.has(folder) ? FRESHNESS_RULE(id, source) : null
   const rules = [fresh, rule ? rule(id) : null, COMMON_RULE(id)].filter(Boolean).map((r) => `- ${r}`).join("\n")
   const top = `${OPEN}\n${head.join("\n")}\n\nRules:\n${rules}\n`
+  if (projectVerification) return projectContextText(top, body, projectVerification, id)
   const text = body ? `${top}\nDescription:\n${body}\n${CLOSE}` : `${top}${CLOSE}`
   if (text.length <= LIMIT) return text
   const notice = `\n[agent-tasks: description truncated; run \`task show ${id}\`]\n${CLOSE}`
@@ -485,7 +559,28 @@ export async function registerAgentTasks(ctx, deps) {
       content = await deps.readFile(path, "utf8")
     }
     const { fields, body } = parseTask(content)
-    return contextText({ ...fields, id: fields.id || binding.id, folder: folderOfPath(path), body })
+    let projectVerification
+    if (fields.project) {
+      // Task paths are <store>/<workspace>/<stage>/<task>. Never infer this from
+      // the session checkout, which may be a worktree or a different workspace.
+      const workspace = basename(dirname(dirname(path)))
+      const args = ["project", "show", fields.project, "--ws", workspace, "--json"]
+      const command = `task ${args.map(shellArg).join(" ")}`
+      try {
+        const result = await run(args)
+        if (result.code !== 0) throw new Error("project lookup failed")
+        const record = JSON.parse(result.stdout)
+        if (!object(record) || record.workspace !== workspace || record.name !== fields.project || typeof record.path !== "string" ||
+          (record.settings !== null && !validProjectSettings(record.settings))) throw new Error("invalid project response")
+        if (record.settings !== null) {
+          const instructions = projectInstructions(record.settings)
+          if (instructions) projectVerification = { command, instructions }
+        }
+      } catch {
+        projectVerification = { command, unavailable: true }
+      }
+    }
+    return contextText({ ...fields, id: fields.id || binding.id, folder: folderOfPath(path), body, projectVerification })
   }
 
   const hasBlock = (parts) => parts.some((p) => p?.type === "text" && typeof p.text === "string" && p.text.includes(OPEN))

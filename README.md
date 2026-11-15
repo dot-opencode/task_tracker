@@ -129,6 +129,50 @@ user `opencode`). The address comes from `opencode service status`.
 
 Task sessions use the OpenCode default model unless `config.toml` sets `preset` (an oh-my-opencode-slim preset, e.g. `preset = "claude"`) or `model` (explicit `provider/model`, wins over `preset`).
 
+## Project run and verification settings
+
+Projects can optionally describe how to run and verify their applications. Configure them through the CLI; do not edit the registry directly:
+
+```bash
+task project configure platform --ws work --file verification.json
+task project show platform --ws work --json
+task project configure platform --ws work --clear
+```
+
+`--file -` reads JSON from stdin. Configuration replaces the previous settings; `--clear` removes only settings, not the project registration. Existing path-only projects need no migration.
+
+```json
+{
+  "version": 1,
+  "environment": {
+    "cwd": "/path/to/dev-environment",
+    "start": "Use the existing documented start command",
+    "stop": "Stop only the services started for this task",
+    "readiness": "Check the documented readiness endpoint"
+  },
+  "task_code": {
+    "attach": "Follow the environment instructions to attach the task worktree",
+    "verify_version": "Confirm the running application uses the task revision"
+  },
+  "tests": [
+    { "name": "backend", "cwd": "/path/to/repository", "command": "npm run test:backend" }
+  ],
+  "application": {
+    "url": "http://localhost:3000",
+    "login": "Follow the local test-account instructions",
+    "test_data": "Use the documented local fixtures"
+  },
+  "browser": {
+    "navigation": "Open the affected flow through its normal entry point",
+    "checks": "Verify the result, relevant error states, and browser errors"
+  }
+}
+```
+
+The paths and commands above are illustrative, not a runnable setup. Version 1 supports optional sections and fields, with named test records containing `name`, `cwd`, and `command`. Unknown fields and invalid types are rejected. Store instructions for accessing credentials, never passwords, tokens, cookies, or other secrets: the task store is a Git repository.
+
+The plugin supplies settings to bound task sessions and refreshes them through context and compaction hooks. Settings describe **how** to verify, not a universal requirement to start the application. The agent selects checks by behavioral impact: a UI change, including a changed API response used by a form, requires checking the affected browser scenario on the task version plus suitable automated tests. An internal backend change without UI impact may need only tests. Reading or saving settings never executes their commands or grants browser/environment permissions. Blocked checks must be reported before claiming verification is complete.
+
 ## Layout
 
 ```
@@ -136,7 +180,7 @@ Task sessions use the OpenCode default model unless `config.toml` sets `preset` 
   config.toml
   <workspace>/               work, home, ...
     00_backlog/ … 10_unmerged/ 11_done/ blocked/ postponed/ archive/
-    .projects/<name>         one line: absolute path of the project's repository
+    .projects/<name>         repository path on line one; optional settings JSON below
 ```
 
 ## Tests
@@ -147,4 +191,3 @@ cargo build --release && bash tests/run.sh   # CLI via the launcher + AGENT_TASK
 bash tests/launcher.sh        # launcher download/verify/cache, offline
 TZ=UTC node --test tests/*.test.js     # plugin, RPC and TUI
 ```
-

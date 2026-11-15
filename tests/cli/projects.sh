@@ -1,6 +1,132 @@
 # shellcheck shell=bash
 # Task 3: project registry.
 
+project_json_eq() {
+  node -e 'const a=require("node:assert/strict"); a.deepEqual(JSON.parse(process.argv[1]),JSON.parse(process.argv[2]))' "$1" "$2"
+}
+
+test_projects_show_legacy_json() {
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" >/dev/null
+  project_json_eq "$("$TASK" project show api --ws work --json)" \
+    "{\"workspace\":\"work\",\"name\":\"api\",\"path\":\"$TMP/code\",\"settings\":null}"
+}
+
+test_projects_configure_file_and_registry_format() {
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" >/dev/null
+  local settings='{"version":1,"environment":{"cwd":"repo","start":"touch SHOULD_NOT_EXIST","stop":"stop","readiness":"ready"},"task_code":{"attach":"attach","verify_version":"version"},"tests":[{"name":"backend","cwd":"repo","command":"test"}],"application":{"url":"http://localhost","login":"instructions","test_data":"fixtures"},"browser":{"navigation":"home","checks":"save"}}'
+  printf '%s\n' "$settings" > "$TMP/settings.json"
+  "$TASK" project configure api --file "$TMP/settings.json" >/dev/null
+  project_json_eq "$("$TASK" project show api --json)" \
+    "{\"workspace\":\"work\",\"name\":\"api\",\"path\":\"$TMP/code\",\"settings\":$settings}"
+  node -e 'const fs=require("node:fs"),a=require("node:assert/strict"); const [path,...json]=fs.readFileSync(process.argv[1],"utf8").split("\n"); a.equal(path,process.argv[2]); a.deepEqual(JSON.parse(json.join("\n")),JSON.parse(process.argv[3]))' \
+    "$AGENT_TASKS_HOME/work/.projects/api" "$TMP/code" "$settings"
+  assert_no_file "$TMP/SHOULD_NOT_EXIST"
+  assert_contains "$("$TASK" project ls)" "$TMP/code"
+  assert_not_contains "$("$TASK" project ls)" "version"
+}
+
+test_projects_configure_partial_stdin_and_clear() {
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" >/dev/null
+  local settings
+  for settings in '{"version":1}' '{"version":1,"environment":{"start":"serve"}}' '{"version":1,"tests":[{"name":"unit","cwd":"repo","command":"test"}]}' '{}'; do
+    printf '%s' "$settings" | "$TASK" project configure api --ws work --file - >/dev/null
+    project_json_eq "$("$TASK" project show api --json)" \
+      "{\"workspace\":\"work\",\"name\":\"api\",\"path\":\"$TMP/code\",\"settings\":$settings}"
+  done
+  "$TASK" project configure api --clear >/dev/null
+  assert_eq "$(cat "$AGENT_TASKS_HOME/work/.projects/api")" "$TMP/code"
+  project_json_eq "$("$TASK" project show api --json)" \
+    "{\"workspace\":\"work\",\"name\":\"api\",\"path\":\"$TMP/code\",\"settings\":null}"
+  "$TASK" project configure api --clear >/dev/null
+}
+
+test_projects_configure_rejects_invalid_without_writes() {
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" >/dev/null
+  printf '{"version":1,"browser":{"checks":"keep"}}' | "$TASK" project configure api --file - >/dev/null
+  local before subject settings rc out
+  before="$(cat "$AGENT_TASKS_HOME/work/.projects/api")"
+  subject="$(git -C "$AGENT_TASKS_HOME" rev-parse HEAD)"
+  for settings in 'not-json' 'null' '[]' '{"browser":{}}' '{"version":2}' '{"version":"1"}' '{"version":1.0}' '{"version":true}' '{"version":1,"unknown":1}' '{"version":1,"environment":null}' '{"version":1,"environment":{"start":1}}' '{"version":1,"environment":{"secret":"x"}}' '{"version":1,"task_code":[]}' '{"version":1,"task_code":{"attach":false}}' '{"version":1,"application":{"url":[]}}' '{"version":1,"browser":{"checks":{}}}' '{"version":1,"tests":{}}' '{"version":1,"tests":["test"]}' '{"version":1,"tests":[{"name":"unit","cwd":"repo"}]}' '{"version":1,"tests":[{"name":"unit","command":"test"}]}' '{"version":1,"tests":[{"command":"test"}]}' '{"version":1,"tests":[{"name":"unit","command":"test","extra":1}]}' '{"version":1,"tests":[{"name":"unit","command":false}]}'; do
+    rc=0
+    out="$(printf '%s' "$settings" | "$TASK" project configure api --file - 2>&1)" || rc=$?
+    assert_eq "$rc" 1
+    assert_contains "$out" "settings"
+    assert_eq "$(cat "$AGENT_TASKS_HOME/work/.projects/api")" "$before"
+    assert_eq "$(git -C "$AGENT_TASKS_HOME" rev-parse HEAD)" "$subject"
+  done
+}
+
+test_projects_settings_unknown_and_invalid_options() {
+  local rc out args
+  for args in 'show absent --json' 'configure absent --clear' 'configure absent --file -'; do
+    rc=0
+    out="$(printf '{"version":1}' | "$TASK" project $args 2>&1)" || rc=$?
+    assert_eq "$rc" 1
+    assert_contains "$out" "unknown project"
+  done
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" >/dev/null
+  local before="$(cat "$AGENT_TASKS_HOME/work/.projects/api")"
+  for args in 'configure api' 'configure api --clear --file -' 'configure api --file' 'configure api --file /nonexistent-settings-file' 'show api --json --ws ../bad' 'configure api --clear --ws ../bad'; do
+    rc=0
+    out="$("$TASK" project $args 2>&1)" || rc=$?
+    assert_eq "$rc" 1
+    assert_eq "$(cat "$AGENT_TASKS_HOME/work/.projects/api")" "$before"
+  done
+}
+
+test_projects_settings_workspace_isolation_and_ambiguity() {
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" --ws work >/dev/null
+  "$TASK" project add api "$TMP/code" --ws side >/dev/null
+  local args rc out
+  for args in 'show api --json' 'configure api --clear' 'configure api --file -'; do
+    rc=0
+    out="$(printf '{"version":1}' | "$TASK" project $args 2>&1)" || rc=$?
+    assert_eq "$rc" 1
+    assert_contains "$out" "pass --ws"
+  done
+  printf '{"version":1,"browser":{"checks":"work only"}}' | "$TASK" project configure api --ws work --file - >/dev/null
+  project_json_eq "$("$TASK" project show api --ws side --json)" \
+    "{\"workspace\":\"side\",\"name\":\"api\",\"path\":\"$TMP/code\",\"settings\":null}"
+  assert_contains "$("$TASK" project show api --ws work --json)" 'work only'
+  "$TASK" project configure api --ws side --clear >/dev/null
+  assert_contains "$("$TASK" project show api --ws work --json)" 'work only'
+}
+
+test_projects_settings_preserved_on_path_update_and_import() {
+  mkdir -p "$TMP/a" "$TMP/b"
+  "$TASK" project add api "$TMP/a" >/dev/null
+  printf '{"version":1,"browser":{"checks":"preserve"}}' | "$TASK" project configure api --file - >/dev/null
+  "$TASK" project add api "$TMP/b" >/dev/null
+  assert_contains "$("$TASK" project show api --json)" 'preserve'
+  assert_eq "$("$TASK" project add api "$TMP/b")" "project api (work) is already registered: $TMP/b"
+  export AGENT_MEMORY_HOME="$TMP/mem"
+  mem_project work api "$TMP/a"
+  "$TASK" project import-memory >/dev/null
+  project_json_eq "$("$TASK" project show api --json)" \
+    "{\"workspace\":\"work\",\"name\":\"api\",\"path\":\"$TMP/a\",\"settings\":{\"version\":1,\"browser\":{\"checks\":\"preserve\"}}}"
+}
+
+test_projects_show_rejects_malformed_stored_settings() {
+  mkdir -p "$TMP/code"
+  "$TASK" project add api "$TMP/code" >/dev/null
+  local settings rc out
+  for settings in '{broken' '{"version":2}' '{"version":1,"browser":{"typo":"x"}}'; do
+    printf '%s\n%s\n' "$TMP/code" "$settings" > "$AGENT_TASKS_HOME/work/.projects/api"
+    rc=0
+    out="$("$TASK" project show api --json 2>&1)" || rc=$?
+    assert_eq "$rc" 1
+    assert_contains "$out" "settings"
+  done
+  "$TASK" project configure api --clear >/dev/null
+  assert_eq "$(cat "$AGENT_TASKS_HOME/work/.projects/api")" "$TMP/code"
+}
+
 test_projects_add_explicit_path() {
   mkdir -p "$TMP/code/api"
   local out

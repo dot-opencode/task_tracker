@@ -1,24 +1,27 @@
-//! `task project add|ls|import-memory` (lib/projects.sh). Shared helpers
+//! `task project add|ls|show|configure|import-memory`. Shared helpers
 //! (project_path, project_ws, detect_project) live in crate::projects.
 
 use crate::commit::store_commit;
 use crate::core::*;
 use crate::lock::lock_acquire;
-use crate::projects::project_path;
+use crate::projects::{
+    parse_project_settings, project_path, project_ws, read_project, write_project_settings,
+};
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 /// Writes the registry entry; returns added|updated|unchanged.
 fn register_project(ws: &str, name: &str, path: &str) -> &'static str {
     let f = format!("{}/{}/.projects/{}", store(), ws, name);
     if Path::new(&f).is_file() {
-        let old = read_file(&f)
-            .map(|t| t.split('\n').next().unwrap_or("").to_string())
-            .unwrap_or_default();
+        let record =
+            fs::read_to_string(&f).unwrap_or_else(|e| die(format!("cannot read {f}: {e}")));
+        let (old, payload) = record.split_once('\n').unwrap_or((&record, ""));
         if old == path {
             return "unchanged";
         }
-        if fs::write(&f, format!("{path}\n")).is_err() {
+        if fs::write(&f, format!("{path}\n{payload}")).is_err() {
             die(format!("cannot write {f}"));
         }
         return "updated";
@@ -34,6 +37,80 @@ fn canon(p: &str) -> String {
     fs::canonicalize(p)
         .map(|c| c.to_string_lossy().into_owned())
         .unwrap_or_else(|_| p.to_string())
+}
+
+fn project_settings_command(args: &[String], configure: bool) {
+    let usage = if configure {
+        "usage: task project configure <name> [--ws W] (--file <path|-> | --clear)"
+    } else {
+        "usage: task project show <name> [--ws W] --json"
+    };
+    let (mut name, mut ws) = (String::new(), String::new());
+    let (mut file, mut clear, mut json) = (None, false, false);
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--ws" => {
+                ws = need_value(args, i).to_string();
+                i += 2;
+            }
+            "--file" if configure && file.is_none() => {
+                file = Some(need_value(args, i).to_string());
+                i += 2;
+            }
+            "--clear" if configure && !clear => {
+                clear = true;
+                i += 1;
+            }
+            "--json" if !configure && !json => {
+                json = true;
+                i += 1;
+            }
+            a if !a.starts_with('-') && name.is_empty() => {
+                name = a.into();
+                i += 1;
+            }
+            _ => die(usage),
+        }
+    }
+    if name.is_empty() || (configure && (file.is_some() == clear)) || (!configure && !json) {
+        die(usage);
+    }
+    if !ws.is_empty() && !valid_ws(&ws) {
+        die(format!("invalid workspace '{ws}'"));
+    }
+    // Resolve again under the lock for mutations, including ambiguous names.
+    if configure {
+        lock_acquire();
+    }
+    let ws = project_ws(&name, &ws);
+    if !configure {
+        let (path, settings) = read_project(&ws, &name).unwrap_or_else(|e| die(e));
+        println!(
+            "{}",
+            serde_json::json!({"workspace": ws, "name": name, "path": path, "settings": settings})
+        );
+        return;
+    }
+    let settings = file.map(|file| {
+        let text = if file == "-" {
+            let mut text = String::new();
+            std::io::stdin()
+                .read_to_string(&mut text)
+                .unwrap_or_else(|e| die(format!("cannot read project settings stdin: {e}")));
+            text
+        } else {
+            fs::read_to_string(&file)
+                .unwrap_or_else(|e| die(format!("cannot read project settings {file}: {e}")))
+        };
+        parse_project_settings(&text).unwrap_or_else(|e| die(e))
+    });
+    write_project_settings(&ws, &name, settings.as_ref()).unwrap_or_else(|e| die(e));
+    println!(
+        "{} project settings {name} ({ws})",
+        if clear { "cleared" } else { "configured" }
+    );
+    store_commit();
 }
 
 fn project_add(args: &[String]) {
@@ -228,8 +305,10 @@ pub fn cmd_project(args: &[String]) -> i32 {
     match sub {
         "add" => project_add(rest),
         "ls" => project_ls(rest),
+        "show" => project_settings_command(rest, false),
+        "configure" => project_settings_command(rest, true),
         "import-memory" => project_import_memory(rest),
-        _ => die("usage: task project add|ls|import-memory"),
+        _ => die("usage: task project add|ls|show|configure|import-memory"),
     }
     0
 }
